@@ -141,6 +141,11 @@ struct SidebarView: View {
                             ForEach(unit.lessons) { lesson in
                                 LessonRow(lesson: lesson).tag(Optional(lesson.id))
                                     .contextMenu {
+                                        if app.isCompleted(lesson.id) {
+                                            Button("Mark as Not Complete") { app.setCompleted(lesson.id, false) }
+                                        } else {
+                                            Button("Mark as Complete") { app.setCompleted(lesson.id, true) }
+                                        }
                                         if app.library.contains(lesson.id) {
                                             Button("Remove from My Songs", role: .destructive) { app.removeImportedSong(lesson.id) }
                                         }

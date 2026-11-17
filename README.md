@@ -64,6 +64,8 @@ There are two kinds of playing task:
 
 After each task you get a result card with the numbers and one to three stars.
 
+A lesson is marked complete when you finish its last step. You can also mark or unmark any lesson yourself: use the **Mark complete** button in the lesson header, right-click the lesson in the sidebar, or press `⌘K`. Unmarking keeps the stars you earned.
+
 ### Practice aids
 
 Under every timed task:
@@ -102,6 +104,7 @@ You can click the on-screen keys, or type on the Mac keyboard:
 | `⌘D` | play the demo |
 | `⌘1` | Today |
 | `⌘I` | import a song |
+| `⌘K` | mark lesson complete / not complete |
 | `⌘0` | free play |
 
 Mouse and typed notes use a fixed velocity, so tasks that score dynamics or accents need a real keyboard.
@@ -228,6 +231,7 @@ swift build                                     # debug build
 .build/debug/PianoCoach --check -v              # validate every lesson
 .build/debug/PianoCoach --selftest              # engine, import, plan and profile tests
 .build/debug/PianoCoach --snapshot out/ <id>    # render a lesson's steps to PNG
+.build/debug/PianoCoach --import-info <files>   # show how MIDI / MusicXML files would import
 scripts/build-app.sh                            # release build + .app bundle
 ```
 

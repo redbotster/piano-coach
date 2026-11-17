@@ -613,7 +613,14 @@ enum SongImport {
         out.sort { $0.beat != $1.beat ? $0.beat < $1.beat : $0.midi < $1.midi }
 
         let base = (filename as NSString).deletingPathExtension
-        let title = raw.title.flatMap { $0.isEmpty ? nil : $0 } ?? (base.isEmpty ? "Imported song" : base)
+        // The file name is what the user chose, so it wins; names embedded in files are often
+        // generic ("control track"). Fall back to the embedded title for generic file names.
+        func isGeneric(_ name: String) -> Bool {
+            let n = name.lowercased().trimmingCharacters(in: .whitespaces)
+            return n.isEmpty || ["score", "xml_score", "untitled", "control track", "conductor", "tempo", "track 0", "track 1", "midi", "song", "export"].contains(n)
+        }
+        let embedded = raw.title.flatMap { isGeneric($0) ? nil : $0 }
+        let title = !isGeneric(base) ? base : (embedded ?? "Imported song")
         return ImportedSong(id: UUID().uuidString, title: title, sourceFile: filename, bpm: bpm,
                             beatsPerBar: numerator, beatUnit: denominator, fifths: min(7, max(-7, raw.fifths)),
                             minor: raw.minor, notes: out)
@@ -758,9 +765,9 @@ enum SongImport {
         </score-partwise>
         """
         do {
-            let song = try parse(data: Data(xml.utf8), filename: "test.musicxml")
+            let song = try parse(data: Data(xml.utf8), filename: "score.musicxml")
             let events = SongImport.events(for: song)
-            expect(song.title == "Test Song", "MusicXML title (got \(song.title))")
+            expect(song.title == "Test Song", "MusicXML title used when the file name is generic (got \(song.title))")
             expect(abs(song.bpm - 90) < 0.01 && song.fifths == -1 && song.beatsPerBar == 4, "MusicXML tempo 90, one flat, 4/4")
             expect(events.map { $0.beat } == [0, 2, 4, 5], "MusicXML events on beats 0, 2, 4, 5 (got \(events.map { $0.beat }))")
             if events.count == 4 {

@@ -131,6 +131,13 @@ final class ProfileStore: ObservableObject {
         expect(reloaded.profiles.count == 1, "a profile can be deleted")
         reloaded.delete(firstID)
         expect(reloaded.profiles.count == 1, "the last profile cannot be deleted")
+        // Manual completion marks persist and can be cleared.
+        let marks = ProgressStore(url: reloaded.progressURL)
+        marks.update("some.lesson") { $0.completed = true; $0.stars = 2 }
+        expect(ProgressStore(url: reloaded.progressURL).record("some.lesson").completed, "marking a lesson complete is saved")
+        marks.update("some.lesson") { $0.completed = false }
+        let cleared = ProgressStore(url: reloaded.progressURL).record("some.lesson")
+        expect(!cleared.completed && cleared.stars == 2, "unmarking keeps the stars already earned")
         print(failures == 0 ? "All profile checks passed" : "\(failures) profile check(s) failed")
         return failures == 0
     }

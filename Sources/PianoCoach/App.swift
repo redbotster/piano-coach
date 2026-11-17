@@ -31,6 +31,10 @@ struct PianoCoachApp: App {
                 Button("Next Step") { app.nextStep() }.keyboardShortcut(.rightArrow, modifiers: .command)
                 Button("Previous Step") { app.previousStep() }.keyboardShortcut(.leftArrow, modifiers: .command)
                 Button("Restart Step") { app.retryTask() }.keyboardShortcut("r", modifiers: .command)
+                Button("Mark Lesson Complete / Not Complete") {
+                    if let id = app.lesson?.id { app.setCompleted(id, !app.isCompleted(id)) }
+                }
+                .keyboardShortcut("k", modifiers: .command)
                 Button("Play Demo") { app.playDemo() }.keyboardShortcut("d", modifiers: .command)
                 Divider()
                 Button("Next Lesson") { app.goToNextLesson() }.keyboardShortcut(.rightArrow, modifiers: [.command, .shift])
@@ -62,6 +66,10 @@ enum Main {
             let plan = PracticePlan.selfTest()
             let profiles = ProfileStore.selfTest()
             exit(engine && importer && plan && profiles ? 0 : 1)
+        }
+        if let i = args.firstIndex(of: "--import-info"), args.count > i + 1 {
+            for path in args[(i + 1)...] { print(SongImport.debugSummary(of: URL(fileURLWithPath: path))) }
+            exit(0)
         }
         if let i = args.firstIndex(of: "--icon"), args.count > i + 1 {
             MainActor.assumeIsolated { Snapshot.renderIcon(to: args[i + 1]) }

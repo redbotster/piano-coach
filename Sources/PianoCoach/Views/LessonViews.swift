@@ -101,6 +101,16 @@ struct LessonView: View {
                 Text(lesson.title).font(.title2.weight(.semibold))
                 Spacer()
                 StepDots(lesson: lesson)
+                let done = app.isCompleted(lesson.id)
+                Button {
+                    app.setCompleted(lesson.id, !done)
+                } label: {
+                    Label(done ? "Completed" : "Mark complete", systemImage: done ? "checkmark.circle.fill" : "circle")
+                }
+                .buttonStyle(.bordered)
+                .tint(done ? Palette.good : nil)
+                .help(done ? "Click to mark this lesson as not complete" : "Mark this lesson as complete without finishing every step")
+                .padding(.leading, 10)
             }
         }
         .padding(.horizontal, 22)

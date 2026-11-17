@@ -312,6 +312,26 @@ final class AppModel: ObservableObject {
         loadCurrentProfile()
     }
 
+    /// Manually mark a lesson complete, or clear the mark (stars and best tempos are kept).
+    func setCompleted(_ lessonID: String, _ completed: Bool) {
+        progress.update(lessonID) { record in
+            record.completed = completed
+            if completed {
+                if record.lastPracticed == nil { record.lastPracticed = Date() }
+            } else {
+                record.due = nil
+                record.reviewIntervalDays = nil
+            }
+        }
+        if !completed, lessonID == selectedLessonID, lessonFinished {
+            lessonFinished = false
+            prepareStep()
+        }
+        objectWillChange.send()
+    }
+
+    func isCompleted(_ lessonID: String) -> Bool { progress.record(lessonID).completed }
+
     func resetAllProgress() {
         progress.reset()
         history.reset()
