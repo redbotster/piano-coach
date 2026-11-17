@@ -205,3 +205,7 @@ lesson("foundations.example", "C position", "Five notes under five fingers.", [
 Rhythm tokens are `w h q e s t` (whole to 32nd), with `.` for dots, `r` for rests, `3`/`5`/`6` prefixes for tuplets, and `~` for ties. Run `--check` after editing; it catches notes off the keyboard, impossible hand spans, duplicate ids and bad timing.
 
 Progress is stored in `~/Library/Application Support/PianoCoach/progress.json`.
+
+## License
+
+[MIT](LICENSE)
