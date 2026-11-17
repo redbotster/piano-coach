@@ -101,3 +101,93 @@ final class AudioEngine {
         clicker.play()
     }
 }
+
+/// Plays a list of notes at exact host times from a high-priority queue, so playback stays even
+/// regardless of what the main thread is drawing.
+final class NoteSequencer {
+    struct Event {
+        var time: Double      // seconds on the `HostClock` timeline
+        var note: Int
+        var velocity: Int     // 0 = note off
+    }
+
+    private let audio: AudioEngine
+    private let queue = DispatchQueue(label: "pianocoach.sequencer", qos: .userInteractive)
+    private var timer: DispatchSourceTimer?
+    private var events: [Event] = []
+    private var next = 0
+    private var sounding: [Int: Int] = [:]
+
+    /// Called on the sequencer queue with how late each event fired, in seconds (used by the self-test).
+    var onFire: ((Double) -> Void)?
+
+    init(audio: AudioEngine) { self.audio = audio }
+
+    /// Fires silent events and checks they land on time.
+    static func selfTest() -> Bool {
+        let sequencer = NoteSequencer(audio: AudioEngine())
+        var late: [Double] = []
+        sequencer.onFire = { late.append($0) }
+        let start = HostClock.now() + 0.05
+        sequencer.play((0..<60).map { Event(time: start + Double($0) * 0.02, note: 60, velocity: 0) })
+        Thread.sleep(forTimeInterval: 1.5)
+        sequencer.stop()
+        let worst = late.map { abs($0) }.max() ?? 1
+        let ok = late.count == 60 && worst < 0.005
+        print(String(format: "  %@  sequencer fired %d of 60 events, worst lateness %.2f ms", ok ? "ok  " : "FAIL", late.count, worst * 1000))
+        return ok
+    }
+
+    func play(_ list: [Event]) {
+        stop()
+        // Note-offs before note-ons at the same instant, so repeated notes re-strike.
+        let sorted = list.sorted { $0.time != $1.time ? $0.time < $1.time : $0.velocity < $1.velocity }
+        queue.sync {
+            events = sorted
+            next = 0
+            let t = DispatchSource.makeTimerSource(flags: .strict, queue: queue)
+            t.setEventHandler { [weak self] in self?.fire() }
+            timer = t
+            arm()
+            t.resume()
+        }
+    }
+
+    func stop() {
+        queue.sync {
+            timer?.cancel()
+            timer = nil
+            events = []
+            next = 0
+            for note in sounding.keys { audio.noteOff(note) }
+            sounding = [:]
+        }
+    }
+
+    private func arm() {
+        guard let timer, next < events.count else { return }
+        let delay = max(0, events[next].time - HostClock.now())
+        timer.schedule(deadline: .now() + delay, repeating: .never, leeway: .nanoseconds(0))
+    }
+
+    private func fire() {
+        let now = HostClock.now() + 0.0005
+        while next < events.count, events[next].time <= now {
+            let e = events[next]
+            next += 1
+            onFire?(HostClock.now() - e.time)
+            if e.velocity > 0 {
+                audio.noteOn(e.note, velocity: e.velocity)
+                sounding[e.note, default: 0] += 1
+            } else if let count = sounding[e.note] {
+                if count <= 1 {
+                    sounding[e.note] = nil
+                    audio.noteOff(e.note)
+                } else {
+                    sounding[e.note] = count - 1
+                }
+            }
+        }
+        arm()
+    }
+}

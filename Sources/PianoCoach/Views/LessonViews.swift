@@ -246,7 +246,8 @@ struct InfoStepView: View {
             }
             if let example = info.example {
                 VStack(alignment: .leading, spacing: 10) {
-                    NotationPanel(task: example, statuses: [], current: nil, hitMarks: [], clock: nil, running: false)
+                    NotationPanel(task: example, statuses: [], current: nil, hitMarks: [],
+                                  clock: app.demoScroll != nil ? app.demoClock : nil, running: app.demoScroll != nil)
                     Button {
                         app.isDemoPlaying ? app.stopDemo() : app.playDemo()
                     } label: {
@@ -339,8 +340,8 @@ struct TaskView: View {
                 if task.display != .keyboard {
                     NotationPanel(task: task, statuses: runner.statuses,
                                   current: runner.phase == .done ? nil : runner.index,
-                                  hitMarks: runner.hitMarks, clock: runner.clock,
-                                  running: runner.phase == .running || runner.phase == .countIn)
+                                  hitMarks: runner.hitMarks, clock: app.demoScroll != nil ? app.demoClock : runner.clock,
+                                  running: runner.phase == .running || runner.phase == .countIn || app.demoScroll != nil)
                         .padding(12)
                         .background(RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.04)))
                         .overlay(alignment: .center) { countInOverlay }

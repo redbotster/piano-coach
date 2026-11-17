@@ -1,0 +1,83 @@
+import Foundation
+
+// More beginner songs: traditional tunes in the public domain, in simple arrangements written for this app.
+// Most stay under one hand position, with a left hand that plays one or two notes per bar.
+
+extension Curriculum {
+    static var sMoreFirst: CurriculumUnit {
+        let cPos = "C4 D4 E4 F4 G4"
+        /// Thumb on G below Middle C, with a gap between fingers 2 and 3.
+        let lowPos = "G3 A3 C4 D4 E4"
+        let list: [Song] = [
+            Song(id: "songs.easy.hot-cross-buns", title: "Hot Cross Buns", summary: "Three notes, three fingers: the easiest tune there is.",
+                 about: "An English street cry, first printed in the 1700s.\n\nKey of C, 4/4. The whole tune uses only **C, D and E** under fingers 1, 2 and 3. Bar 3 has eighth notes: two to a beat, counted \"1-and 2-and\".",
+                 slow: 66, tempo: 100,
+                 rh: "E4 D4 C4:h | E4 D4 C4:h | C4:e C4:e C4:e C4:e D4:e D4:e D4:e D4:e | E4 D4 C4:h",
+                 lh: "C3 C3 C3:h G2:h C3", pos: cPos),
+            Song(id: "songs.easy.mary-lamb", title: "Mary Had a Little Lamb", summary: "Stepwise melody in C position with one skip.",
+                 about: "An American nursery song from the 1830s.\n\nKey of C, 4/4. It moves by step between C, D and E, with a single skip up to **G** in bar 4. Hold the half notes for their full two beats.",
+                 slow: 66, tempo: 104,
+                 rh: "E4 D4 C4 D4 | E4 E4 E4:h | D4 D4 D4:h | E4 G4 G4:h | E4 D4 C4 D4 | E4 E4 E4 E4 | D4 D4 E4 D4 | C4:w",
+                 lh: "C3 C3 G2 C3 C3 C3 G2 C3", pos: cPos),
+            Song(id: "songs.easy.lightly-row", title: "Lightly Row", summary: "A German folk tune that uses all five fingers.",
+                 about: "A German folk song (*Hänschen klein*), a staple of beginner books.\n\nKey of C, 4/4. Everything lies in **C position**. Lines 1, 2 and 4 start the same way, so there is less to learn than it looks. Line 3 climbs by step from D, then from E.",
+                 slow: 66, tempo: 104,
+                 rh: "G4 E4 E4:h | F4 D4 D4:h | C4 D4 E4 F4 | G4 G4 G4:h | G4 E4 E4:h | F4 D4 D4:h | C4 E4 G4 G4 | E4 E4 E4:h | D4 D4 D4 D4 | D4 E4 F4:h | E4 E4 E4 E4 | E4 F4 G4:h | G4 E4 E4:h | F4 D4 D4:h | C4 E4 G4 G4 | C4:w",
+                 lh: "C3 G2 C3 C3 C3 G2 C3 C3 G2 G2 C3 C3 C3 G2 C3 C3", pos: cPos),
+            Song(id: "songs.easy.au-clair", title: "Au clair de la lune", summary: "A French lullaby with a middle line below Middle C.",
+                 about: "A French folk song from the 1700s.\n\nKey of C, 4/4. The first line is played twice in C position. For the third line the hand moves down so that finger 5 plays D and the **thumb reaches G below Middle C**; then it returns for the last line. Follow the finger numbers at each move.",
+                 slow: 66, tempo: 96,
+                 rh: "C4:q:1 C4:q:1 C4:q:1 D4:q:2 | E4:h:3 D4:h:2 | C4:q:1 E4:q:3 D4:q:2 D4:q:2 | C4:w:1 | C4:q:1 C4:q:1 C4:q:1 D4:q:2 | E4:h:3 D4:h:2 | C4:q:1 E4:q:3 D4:q:2 D4:q:2 | C4:w:1 | D4:q:5 D4:q:5 D4:q:5 D4:q:5 | A3:h:2 A3:h:2 | D4:q:5 C4:q:4 B3:q:3 A3:q:2 | G3:w:1 | C4:q:1 C4:q:1 C4:q:1 D4:q:2 | E4:h:3 D4:h:2 | C4:q:1 E4:q:3 D4:q:2 D4:q:2 | C4:w:1",
+                 lh: "C3 | C3:h G2:h | C3:h G2:h | C3 | C3 | C3:h G2:h | C3:h G2:h | C3 | G2 | D3 | G2:h D3:h | G2 | C3 | C3:h G2:h | C3:h G2:h | C3",
+                 dynamic: "mp"),
+            Song(id: "songs.easy.alouette", title: "Alouette (refrain)", summary: "A French-Canadian tune with a long–short rhythm.",
+                 about: "A French-Canadian folk song. This is the refrain, played twice.\n\nKey of C, 4/4. It opens with a **dotted quarter and eighth** (long–short). The thumb sits on **G below Middle C** and finger 2 starts on C.",
+                 slow: 66, tempo: 104,
+                 rh: rep("C4:q. D4:e E4 E4 | D4:e C4:e D4:e E4:e C4 G3 | C4:q. D4:e E4 E4 | D4:e C4:e D4:e E4:e C4:h |", 2),
+                 lh: "C3 | G2:h C3:h | C3 | G2:h C3:h | C3 | G2:h C3:h | C3 | G2:h C3:h", pos: "G3 C4 D4 E4"),
+            Song(id: "songs.easy.jolly-st-nick", title: "Jolly Old Saint Nicholas", summary: "A Christmas song built from repeated notes.",
+                 about: "An American Christmas song from the 1860s.\n\nKey of C, 4/4. Almost every bar is one note played four times, so you can look ahead to the next bar while you play. The thumb sits on **G below Middle C**; fingers 3, 4 and 5 play C, D and E.",
+                 slow: 69, tempo: 108,
+                 rh: "E4 E4 E4 E4 | D4 D4 D4:h | C4 C4 C4 C4 | E4:w | A3 A3 A3 A3 | G3 G3 C4:h | D4 C4 D4 E4 | D4:w | E4 E4 E4 E4 | D4 D4 D4:h | C4 C4 C4 C4 | E4:w | A3 A3 A3 A3 | G3 G3 C4:h | D4 C4 D4 E4 | C4:w",
+                 lh: "C3 G2 C3 C3 F3 C3 G2 G2 C3 G2 C3 C3 F3 C3 G2 C3", pos: lowPos),
+            Song(id: "songs.easy.old-macdonald", title: "Old MacDonald Had a Farm", summary: "The main strain, dipping below Middle C.",
+                 about: "A traditional song known in many versions since the 1700s. This is the main strain, played twice.\n\nKey of C, 4/4. The thumb sits on **G below Middle C**; fingers 3, 4 and 5 play C, D and E. The second time starts with a pickup note on beat 4.",
+                 slow: 69, tempo: 108,
+                 rh: "C4 C4 C4 G3 | A3 A3 G3:h | E4 E4 D4 D4 | C4:h. G3 | C4 C4 C4 G3 | A3 A3 G3:h | E4 E4 D4 D4 | C4:w",
+                 lh: "C3 | F3:h C3:h | C3:h G2:h | C3 | C3 | F3:h C3:h | C3:h G2:h | C3", pos: lowPos),
+            Song(id: "songs.easy.this-old-man", title: "This Old Man", summary: "A counting song with a run of quick notes.",
+                 about: "An English counting song, collected in the 1800s.\n\nKey of C, 4/4. It starts with finger 4 on G so that finger 5 can reach **A**. Bars 5 and 6 have eighth notes; bar 6 is simply C–D–E–F–G, one finger after another.",
+                 slow: 66, tempo: 104,
+                 rh: "G4:q:4 E4:q:2 G4:h:4 | G4:q:4 E4:q:2 G4:h:4 | A4:q:5 G4:q:4 F4:q:3 E4:q:2 | D4:q:1 E4:q:2 F4:q:3 E4:e:2 F4:e:3 | G4:q:4 C4:q:1 C4:e:1 C4:e:1 C4:q:1 | C4:e:1 D4:e:2 E4:e:3 F4:e:4 G4:h:5 | G4:q:5 D4:q:2 D4:q:2 F4:q:4 | E4:q:3 D4:q:2 C4:h:1",
+                 lh: "C3 | C3 | F3:h C3:h | G2 | C3 | C3 | G2 | C3"),
+            Song(id: "songs.easy.skip-to-my-lou", title: "Skip to My Lou", summary: "An American play-party song over two bass notes.",
+                 about: "An American play-party song from the 1800s.\n\nKey of C, 4/4. Each line starts with two long notes. In bars 3 and 4 the thumb steps down to **B** just below Middle C, then comes straight back.",
+                 slow: 69, tempo: 108,
+                 rh: "E4:h C4:h | E4:q E4:e E4:e G4:h | D4:h B3:h:1 | D4:q D4:e D4:e F4:h | E4:h C4:h | E4:q E4:e E4:e G4:h | D4:q E4:e F4:e E4:q D4:q | C4:h C4:h",
+                 lh: "C3 C3 G2 G2 C3 C3 G2 C3", pos: cPos),
+            Song(id: "songs.easy.oh-susanna", title: "Oh! Susanna", summary: "Stephen Foster's tune, verse and chorus.",
+                 about: "Written by **Stephen Foster** in 1848.\n\nKey of C, 4/4, starting with two pickup eighth notes. The verse uses only C, D, E, G and A, so the hand sits with **finger 4 on G and finger 5 on A**. In the chorus, finger 4 moves down to play F.",
+                 slow: 72, tempo: 112,
+                 rh: "r:h. C4:e D4:e | E4 G4 G4:q. A4:e | G4 E4 C4:q. D4:e | E4 E4 D4 C4 | D4:h. C4:e D4:e | E4 G4 G4:q. A4:e | G4 E4 C4:q. D4:e | E4 E4 D4 D4 | C4:h. r | F4:h:4 F4:h:4 | A4 A4:h A4 | G4 G4 E4 C4 | D4:h. C4:e D4:e | E4 G4 G4:q. A4:e | G4 E4 C4:q. D4:e | E4 E4 D4 D4 | C4:h.",
+                 lh: "r | C3 | C3 | C3 | G2 | C3 | C3 | C3:h G2:h | C3 | F3 | F3 | C3 | G2 | C3 | C3 | C3:h G2:h | C3:h.",
+                 pos: "C4 D4 E4 G4 A4"),
+            Song(id: "songs.easy.row-your-boat", title: "Row, Row, Row Your Boat", summary: "A round in 6/8 that rises through an octave.",
+                 about: "An American round, first printed in 1852.\n\nKey of C, **6/8**: six eighth notes per bar, felt as two swings. The first half climbs by step in C position. At \"merrily\" the hand opens out over the **C chord** — fingers 5, 3, 2 and 1 on high C, G, E and C — then closes again for the last line.",
+                 meter: (6, 8), unit: 8, accent: [0, 3], slow: 132, tempo: 192,
+                 rh: "C4:q.:1 C4:q.:1 | C4:q:1 D4:e:2 E4:q.:3 | E4:q:3 D4:e:2 E4:q:3 F4:e:4 | G4:h.:5 | C5:e:5 C5:e:5 C5:e:5 G4:e:3 G4:e:3 G4:e:3 | E4:e:2 E4:e:2 E4:e:2 C4:e:1 C4:e:1 C4:e:1 | G4:q:5 F4:e:4 E4:q:3 D4:e:2 | C4:h.:1",
+                 lh: "C3 C3 C3 C3 C3 C3 G2 C3", ld: "h."),
+            Song(id: "songs.easy.pop-goes-the-weasel", title: "Pop! Goes the Weasel", summary: "A skipping 6/8 tune with one surprise leap.",
+                 about: "An English dance tune from the 1850s, given here without its pickup notes.\n\nKey of C, **6/8**, felt as two swings per bar. The long–short pattern (quarter then eighth) gives it a skipping feel. At \"Pop!\" the hand opens and finger 5 jumps up to **A**.",
+                 meter: (6, 8), unit: 8, accent: [0, 3], slow: 132, tempo: 184,
+                 rh: "C4:q:1 C4:e:1 D4:q:2 D4:e:2 | E4:e:3 G4:e:5 E4:e:3 C4:q.:1 | C4:q:1 C4:e:1 D4:q:2 D4:e:2 | E4:q.:3 C4:q.:1 | C4:q:1 C4:e:1 D4:q:2 D4:e:2 | E4:e:3 G4:e:5 E4:e:3 C4:q.:1 | A4:q.:5 D4:q:2 F4:e:4 | E4:q.:3 C4:q.:1",
+                 lh: "C3 C3 C3 C3 C3 C3 F3:q. G2:q. C3", ld: "h."),
+            Song(id: "songs.easy.good-king-wenceslas", title: "Good King Wenceslas", summary: "A carol that moves between two hand positions.",
+                 about: "The melody is a 13th-century spring carol (*Tempus adest floridum*); the Christmas words were added in 1853.\n\nKey of C, 4/4, with no eighth notes at all. The tune uses two hand positions: a **low one with the thumb on G** below Middle C, and ordinary **C position** for the falling line G–F–E–D. The finger numbers show each change.",
+                 slow: 69, tempo: 104,
+                 rh: "C4:q:4 C4:q:4 C4:q:4 D4:q:5 | C4:q:4 C4:q:4 G3:h:1 | A3:q:2 G3:q:1 A3:q:2 B3:q:3 | C4:h:4 C4:h:4 | C4:q:4 C4:q:4 C4:q:4 D4:q:5 | C4:q:4 C4:q:4 G3:h:1 | A3:q:2 G3:q:1 A3:q:2 B3:q:3 | C4:h:4 C4:h:4 | G4:q:5 F4:q:4 E4:q:3 D4:q:2 | E4:q:3 D4:q:2 C4:h:1 | A3:q:2 G3:q:1 A3:q:2 B3:q:3 | C4:h:4 C4:h:4 | G3:q:1 G3:q:1 A3:q:2 B3:q:3 | C4:q:4 C4:q:4 D4:h:5 | G4:q:5 F4:q:4 E4:q:3 D4:q:2 | C4:h:1 F4:h:4 | C4:w:1",
+                 lh: "C3 | C3 | F3:h G2:h | C3 | C3 | C3 | F3:h G2:h | C3 | C3:h G2:h | C3 | F3:h G2:h | C3 | G2 | C3:h G2:h | C3:h G2:h | C3:h F3:h | C3",
+                 fermataLast: true),
+        ]
+        return unit("songs.easy", "More first songs", list.map { songLesson($0) })
+    }
+}

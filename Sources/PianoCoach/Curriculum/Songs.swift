@@ -3,7 +3,7 @@ import Foundation
 // Songs: public-domain pieces only (traditional, or published in 1930 or earlier),
 // in simple arrangements written for this app. No in-copyright material is included.
 
-fileprivate struct Song {
+struct Song {
     var id: String
     var title: String
     var summary: String
@@ -28,7 +28,7 @@ fileprivate struct Song {
 extension Curriculum {
     static var songs: CurriculumSection {
         CurriculumSection(id: "songs", title: "Songs", symbol: "music.quarternote.3",
-                          units: [sFirst, sFolk, sClassics, sStage, sModern])
+                          units: [sFirst, sMoreFirst, sFolk, sClassics, sStage, sModern])
     }
 
     // MARK: - Helpers
@@ -53,7 +53,7 @@ extension Curriculum {
         }
     }
 
-    fileprivate static func songLesson(_ s: Song) -> Lesson {
+    static func songLesson(_ s: Song) -> Lesson {
         var rh = L.melody(expand(s.rh, s.rd), hand: .right, unit: s.unit)
         if let pos = s.pos { rh = autoFinger(rh, Music.notes(pos)) }
         if s.fermataLast, !rh.isEmpty { rh[rh.count - 1].fermata = true }
@@ -93,7 +93,7 @@ extension Curriculum {
         return lesson(id, title, summary, steps)
     }
 
-    fileprivate static func rep(_ text: String, _ times: Int) -> String {
+    static func rep(_ text: String, _ times: Int) -> String {
         Array(repeating: text, count: times).joined(separator: " ")
     }
 

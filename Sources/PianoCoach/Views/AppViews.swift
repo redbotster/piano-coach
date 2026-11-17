@@ -243,7 +243,11 @@ struct KeyboardPanel: View {
             .padding(.horizontal, 14)
             .frame(height: 22)
 
-            if app.fallingNotes, !app.lessonFinished, let runner = app.runner, runner.task.isTimed, runner.task.showTargets,
+            if app.fallingNotes, let demo = app.demoScroll, !demo.task.events.allSatisfy({ $0.isAnyKey }) {
+                FallingNotesView(task: demo.task, statuses: [], clock: app.demoClock, bpm: demo.bpm)
+                    .frame(height: 130)
+                    .padding(.horizontal, 10)
+            } else if app.fallingNotes, !app.lessonFinished, let runner = app.runner, runner.task.isTimed, runner.task.showTargets,
                runner.phase != .done, !runner.task.events.allSatisfy({ $0.isAnyKey }) {
                 FallingNotesView(task: runner.task, statuses: runner.statuses, clock: runner.clock, bpm: runner.bpm)
                     .frame(height: 130)

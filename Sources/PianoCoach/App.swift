@@ -65,7 +65,8 @@ enum Main {
             let importer = SongImport.selfTest()
             let plan = PracticePlan.selfTest()
             let profiles = ProfileStore.selfTest()
-            exit(engine && importer && plan && profiles ? 0 : 1)
+            let sequencer = NoteSequencer.selfTest()
+            exit(engine && importer && plan && profiles && sequencer ? 0 : 1)
         }
         if let i = args.firstIndex(of: "--import-info"), args.count > i + 1 {
             for path in args[(i + 1)...] { print(SongImport.debugSummary(of: URL(fileURLWithPath: path))) }

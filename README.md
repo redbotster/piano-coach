@@ -10,7 +10,7 @@ It was built for the 61-key **Novation Launchkey 61**, and works with any MIDI k
 
 - **Shows the full 61-key keyboard** (C2–C7) and lights the keys for each step: blue for the right hand, orange for the left, with finger numbers on the keys.
 - **Listens over MIDI** and marks each note green or red as you play.
-- **Walks you through 254 lessons** that mix short explanations, a Listen/Demo button, and scored playing tasks.
+- **Walks you through 267 lessons** that mix short explanations, a Listen/Demo button, and scored playing tasks.
 - **Plans your practice**: a Today screen builds a 15–20 minute session from a warm-up, lessons due for review (spaced repetition), and what's next.
 - **Scores what a teacher would listen for:**
   - note accuracy and wrong notes
@@ -53,7 +53,7 @@ The build is ad-hoc signed, not notarized, so it is meant to be built on the Mac
 
 1. Connect the keyboard by USB. The toolbar shows a green dot and the device name when it is detected.
 2. Start from **Today** for a suggested session, or choose any lesson in the sidebar.
-3. Read each step, press **Listen** or **Demo** to hear it, then play.
+3. Read each step, press **Listen** or **Demo** to hear it, then play. The demo counts in, then the notes scroll down onto the keys as they sound, so you can play along; nothing is scored while a demo plays.
 
 There are two kinds of playing task:
 
@@ -126,7 +126,7 @@ Mouse and typed notes use a fixed velocity, so tasks that score dynamics or acce
 
 ## Curriculum
 
-254 lessons in six sections.
+267 lessons in six sections.
 
 ### 1. Foundations (19 lessons)
 
@@ -200,11 +200,12 @@ Mouse and typed notes use a fixed velocity, so tasks that score dynamics or acce
 
 The app plays the prompt, hides the key lights, and you play back what you heard.
 
-### 6. Songs (39 lessons)
+### 6. Songs (52 lessons)
 
 | Unit | Lessons | Includes |
 |---|---|---|
 | First songs | 8 | Ode to Joy, Twinkle Twinkle, Frère Jacques, Jingle Bells, When the Saints |
+| More first songs | 13 | Hot Cross Buns, Mary Had a Little Lamb, Lightly Row, Au clair de la lune, Old MacDonald, Oh! Susanna, Row Row Row Your Boat, Good King Wenceslas |
 | Folk and traditional | 6 | Happy Birthday, Amazing Grace, Auld Lang Syne, Silent Night |
 | Classics | 14 | Minuet in G, Canon in D, Für Elise, Prelude in C, Gymnopédie No. 1, Moonlight Sonata, Rondo alla Turca |
 | Stage and screen | 5 | Can-Can, Toreador Song, Swan Lake, Daisy Bell, Take Me Out to the Ball Game |

@@ -137,7 +137,15 @@ final class AppModel: ObservableObject {
     private var runnerSink: AnyCancellable?
     private var midiSink: AnyCancellable?
     private var demoWork: [DispatchWorkItem] = []
-    private var silentDemoNotes: Set<Int> = []
+    /// Moving playhead of the demo, in beats (negative during the lead-in).
+    let demoClock = PlayheadClock()
+    /// What the falling-notes view shows while a demo plays; nil when the demo must not reveal the notes.
+    @Published private(set) var demoScroll: (task: PlayTask, bpm: Double)?
+    private lazy var sequencer = NoteSequencer(audio: audio)
+    private var demoTimer: Timer?
+    private var demoSpans: [(on: Double, off: Double, notes: [Int])] = []
+    private var demoEnd = 0.0
+    private var demoClicks = false
     private var keyMonitor: Any?
     private var typedDown: Set<UInt16> = []
     private var tempoOverride: [String: Double] = [:]
@@ -665,7 +673,7 @@ final class AppModel: ObservableObject {
     }
 
     func playDemo() {
-        guard let task = demoTask else { return }
+        guard var task = demoTask else { return }
         stopDemo()
         if let runner, runner.phase == .countIn || (runner.phase == .running && task.isTimed) { runner.reset() }
         let bpm = task.isTimed ? (runner?.bpm ?? task.timedConfig?.bpm ?? 80) : 100
@@ -674,28 +682,70 @@ final class AppModel: ObservableObject {
         let config = task.timedConfig
         let endBpm = config?.tempoEnd.map { $0 * bpm / (config?.bpm ?? bpm) } ?? bpm
         let tempo = TempoMap(bpm0: bpm, bpm1: endBpm, total: task.totalBeats)
-        isDemoPlaying = true
-        var end = 0.0
-        for event in task.prompt ?? task.events {
-            let notes = event.isAnyKey ? [60] : event.notes.map { $0.midi }
-            let on = tempo.time(event.beat) + 0.15
-            let gate = event.articulation == .staccato ? 0.4 : 0.92
-            let off = tempo.time(event.beat + event.duration * gate) + 0.15
-            end = max(end, off)
-            let velocity = event.accent ? 110 : 76
-            schedule(after: on) { [weak self] in
-                guard let self else { return }
-                for n in notes {
-                    self.audio.noteOn(n, velocity: velocity)
-                    if reveal { self.demoNotes.insert(n) } else { self.silentDemoNotes.insert(n) }
-                }
-            }
-            schedule(after: max(on + 0.05, off)) { [weak self] in
-                guard let self else { return }
-                for n in notes { self.audio.noteOff(n); self.demoNotes.remove(n); self.silentDemoNotes.remove(n) }
+        let events = task.prompt ?? task.events
+        task.events = events
+
+        // Lead-in: a counted bar for timed tasks, a short run-up otherwise, so the first notes can be
+        // seen coming and played along with.
+        var leadBeats = 0.0
+        if reveal {
+            if let config, config.metronome != .off, config.countInBeats > 0 {
+                leadBeats = Double(config.countInBeats)
+            } else {
+                leadBeats = (1.5 * bpm / 60).rounded(.up)
             }
         }
-        schedule(after: end + 0.2) { [weak self] in self?.isDemoPlaying = false }
+        let start = HostClock.now() + 0.15 + leadBeats * 60 / bpm
+
+        var notes: [NoteSequencer.Event] = []
+        var spans: [(on: Double, off: Double, notes: [Int])] = []
+        var end = 0.0
+        for event in events {
+            let midis = event.isAnyKey ? [60] : event.notes.map { $0.midi }
+            let on = tempo.time(event.beat)
+            let velocity = event.accent ? 110 : 76
+            var last = on
+            for (i, midi) in midis.enumerated() {
+                let length = event.isAnyKey ? event.duration : (event.notes[i].duration ?? event.duration)
+                let gate = event.articulation == .staccato ? 0.4 : 0.92
+                let off = max(on + 0.05, tempo.time(event.beat + length * gate))
+                notes.append(.init(time: start + on, note: midi, velocity: velocity))
+                notes.append(.init(time: start + off, note: midi, velocity: 0))
+                last = max(last, off)
+            }
+            end = max(end, last)
+            if reveal { spans.append((on, last, midis)) }
+        }
+
+        if let config, reveal, config.metronome != .off {
+            var clicks: [(time: Double, accent: Bool)] = []
+            let last = config.metronome == .on ? Int(task.totalBeats.rounded(.up)) : 0
+            for k in -Int(leadBeats)..<last {
+                let inBar = ((k % config.beatsPerBar) + config.beatsPerBar) % config.beatsPerBar
+                clicks.append((start + tempo.time(Double(k)), config.accentBeats.contains(inBar)))
+            }
+            audio.scheduleClicks(clicks)
+            demoClicks = true
+        }
+
+        demoSpans = spans
+        demoEnd = end
+        demoClock.beat = -leadBeats
+        demoScroll = reveal ? (task, bpm) : nil
+        isDemoPlaying = true
+        sequencer.play(notes)
+
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            let t = HostClock.now() - start
+            self.demoClock.beat = tempo.beat(t)
+            var lit: Set<Int> = []
+            for span in self.demoSpans where span.on <= t && t < span.off { lit.formUnion(span.notes) }
+            if lit != self.demoNotes { self.demoNotes = lit }
+            if t > self.demoEnd + 0.25 { self.stopDemo() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        demoTimer = timer
     }
 
     private func schedule(after delay: Double, _ block: @escaping () -> Void) {
@@ -707,10 +757,14 @@ final class AppModel: ObservableObject {
     func stopDemo() {
         demoWork.forEach { $0.cancel() }
         demoWork = []
-        for n in demoNotes.union(silentDemoNotes) { audio.noteOff(n) }
-        demoNotes = []
-        silentDemoNotes = []
-        isDemoPlaying = false
+        demoTimer?.invalidate()
+        demoTimer = nil
+        sequencer.stop()
+        if demoClicks { audio.cancelClicks(); demoClicks = false }
+        demoSpans = []
+        if !demoNotes.isEmpty { demoNotes = [] }
+        if demoScroll != nil { demoScroll = nil }
+        if isDemoPlaying { isDemoPlaying = false }
     }
 
     // MARK: Input
@@ -726,7 +780,8 @@ final class AppModel: ObservableObject {
             if soundOn { audio.noteOn(note, velocity: velocity) }
             if let calibration {
                 calibration.noteOn(note, velocity: velocity, time: time)
-            } else {
+            } else if demoScroll == nil {
+                // While a demo scrolls, playing along is free practice and is not scored.
                 runner?.noteOn(note, velocity: velocity, time: time)
             }
         case .noteOff(let note, let time):
@@ -789,7 +844,8 @@ final class AppModel: ObservableObject {
                                            finger: runner.task.showFingers ? spec.finger : nil)
             }
         }
-        for note in demoNotes { marks[note] = KeyMark(kind: .demo) }
+        // Playing along with the demo: a lit key turns green while it is held.
+        for note in demoNotes { marks[note] = KeyMark(kind: pressed[note] != nil ? .good : .demo) }
         if let runner {
             for (note, good) in runner.flashes {
                 var mark = marks[note] ?? KeyMark(kind: .good)
