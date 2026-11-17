@@ -71,6 +71,26 @@ enum Main {
             for path in args[(i + 1)...] { print(SongImport.debugSummary(of: URL(fileURLWithPath: path))) }
             exit(0)
         }
+        if let i = args.firstIndex(of: "--import"), args.count > i + 1 {
+            // Adds files to "My Songs" without opening the window. Restart the app to see them.
+            let library = SongLibrary()
+            var failed = false
+            for path in args[(i + 1)...] {
+                let url = URL(fileURLWithPath: path)
+                if library.songs.contains(where: { $0.sourceFile == url.lastPathComponent }) {
+                    print("skipped (already imported): \(url.lastPathComponent)")
+                    continue
+                }
+                do {
+                    try library.importFile(at: url)
+                    print("imported: \(url.lastPathComponent)")
+                } catch {
+                    failed = true
+                    print("FAILED: \(url.lastPathComponent) — \(error)")
+                }
+            }
+            exit(failed ? 1 : 0)
+        }
         if let i = args.firstIndex(of: "--icon"), args.count > i + 1 {
             MainActor.assumeIsolated { Snapshot.renderIcon(to: args[i + 1]) }
             exit(0)

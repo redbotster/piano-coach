@@ -232,6 +232,7 @@ swift build                                     # debug build
 .build/debug/PianoCoach --selftest              # engine, import, plan and profile tests
 .build/debug/PianoCoach --snapshot out/ <id>    # render a lesson's steps to PNG
 .build/debug/PianoCoach --import-info <files>   # show how MIDI / MusicXML files would import
+.build/debug/PianoCoach --import <files>        # add files to My Songs from the command line (restart the app to see them)
 scripts/build-app.sh                            # release build + .app bundle
 ```
 
