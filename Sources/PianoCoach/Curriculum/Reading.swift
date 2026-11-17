@@ -112,6 +112,36 @@ fileprivate enum R {
         return out
     }
 
+    /// A marking below the staff (dynamics, hairpins, pedal).
+    static func below(_ beat: Double, _ text: String) -> StaffMarker { StaffMarker(beat: beat, text: text, below: true) }
+
+    /// A marking above the staff (road-map words, endings, octave signs, chord symbols).
+    static func above(_ beat: Double, _ text: String) -> StaffMarker { StaffMarker(beat: beat, text: text) }
+
+    /// Add notation extras to a task: markers, repeat signs and slurs (pairs of event indices).
+    static func mark(_ task: PlayTask, markers: [StaffMarker] = [], repeats: [RepeatSpan] = [],
+                     slurs: [(Int, Int)] = []) -> PlayTask {
+        var t = task
+        t.markers += markers
+        t.repeats += repeats
+        for (a, b) in slurs where a < t.events.count && b < t.events.count {
+            t.events[a].slurStart = true
+            t.events[b].slurEnd = true
+        }
+        return t
+    }
+
+    static func mark(_ step: Step, markers: [StaffMarker] = [], repeats: [RepeatSpan] = [],
+                     slurs: [(Int, Int)] = []) -> Step {
+        guard case .play(let task) = step else { return step }
+        return .play(mark(task, markers: markers, repeats: repeats, slurs: slurs))
+    }
+
+    /// Notes "as written" with an ornament sign on each one.
+    static func ornamented(_ spec: String, _ ornament: Ornament, start: Double = 0) -> [ExpectedEvent] {
+        L.melody(spec, start: start).map { var e = $0; e.ornament = ornament; return e }
+    }
+
     static func chordName(_ rootPC: Int, _ type: ChordType) -> String {
         let flats = Music.prefersFlats(tonicPC: rootPC, minor: type == .minor || type == .min7)
         return (flats ? Music.flatNames : Music.sharpNames)[rootPC] + type.symbol
@@ -186,8 +216,8 @@ extension Curriculum {
             L.info("The bass spaces", """
             The bass spaces, bottom to top, are **A C E G** — "All Cows Eat Grass".
 
-            A tip that saves a lot of memorising: every bass-clef note is the treble-clef note in the same position, \
-            **moved down two letters** (treble bottom line E → bass bottom line G).
+            A tip that saves a lot of memorising: read the position as if it were treble clef, then go **up two letters**. \
+            The bottom line is E in the treble clef, so it is G in the bass clef; the top line F becomes A.
             """, example: R.example(R.labeled(L.line("A2 C3 E3 G3", hand: .left)), clef: .bass)),
             R.read("Play the bass spaces", "Left hand: A C E G. The keys light up.", L.line("A2 C3 E3 G3", hand: .left), clef: .bass, targets: true),
             R.read("Walk up the bass staff", "No lights now. Read every line and space from the bottom line G up to the top line A.",
@@ -298,7 +328,7 @@ extension Curriculum {
             L.quiz("Landmark + neighbour", "Play the landmark, then the note next to it.", rounds: 10) { _ in
                 let base = R.fresh([48, 53, 60, 67, 72])
                 let pool = R.whites(base - 2, base + 2).filter { $0 != base }
-                let neighbour = base == 60 ? R.pick([62, 64]) : R.pick(pool)
+                let neighbour = R.pick(pool)
                 return R.card([base, neighbour], clef: .grand, title: "Play both notes")
             },
         ])
@@ -523,7 +553,7 @@ extension Curriculum {
 
             Bar lines are also where accidentals expire, and they are your map references: teachers say "start at bar 9".
             """, glyph: "𝄂"),
-            R.readTimed("Read four measures", "Count 1-2-3-4 in every measure and keep going whatever happens. The line moves on without you.",
+            R.readTimed("Read four measures", "Press Start (or the Space bar) and count 1-2-3-4 in every measure. Keep going whatever happens: the playhead moves on without you.",
                         L.melody("E4:q E4:q F4:q G4:q | G4:q F4:q E4:q D4:q | C4:q C4:q D4:q E4:q | D4:h C4:h"), bpm: 66, clef: .treble),
             R.readTimed("Three beats in a measure", "A 3/4 time signature: three quarter-note beats per bar. Count 1-2-3.",
                         L.melody("C4:q E4:q G4:q | A4:h G4:q | F4:q E4:q D4:q | C4:h."), bpm: 72, meter: (3, 4), clef: .treble),
@@ -540,10 +570,13 @@ extension Curriculum {
             - If there is **no start repeat**, go back to the very beginning.
             - The second time, carry straight on past the sign.
 
-            Written:  |: C D E F | G G E – :| C
+            The example shows a passage **as written**, with a start repeat at the beginning and an end repeat after bar 2. \
+            (Listen plays the page straight through once; the repeat is yours to add.)
 
             Played:  C D E F | G G E – | C D E F | G G E – | C
-            """, glyph: "𝄆 𝄇"),
+            """, glyph: "𝄆 𝄇",
+                   example: R.mark(R.timedExample(L.melody("\(phraseA) | G4:q G4:q E4:h | C4:w"), clef: .treble),
+                                   repeats: [RepeatSpan(start: 0, end: 8)])),
             R.readTimed("Play the repeat", "Here is that passage written out in full, the way it sounds. Notice bars 3–4 are bars 1–2 again.",
                         L.melody("\(phraseA) | G4:q G4:q E4:h | \(phraseA) | G4:q G4:q E4:h | C4:w"), bpm: 72, clef: .treble),
             L.info("First and second endings", """
@@ -552,10 +585,13 @@ extension Curriculum {
             - First time: play the **1st ending**, obey the repeat sign and go back.
             - Second time: **skip the 1st ending entirely** and jump straight to the **2nd ending**.
 
-            Written:  |: C D E F | [1.] G E G – :| [2.] E D C – ||
+            The example shows it **as written**: bar 2 is the 1st ending, with the repeat sign after it; bar 3 is the 2nd ending.
 
             Played:  C D E F | G E G – | C D E F | E D C –
-            """, glyph: "1. 2."),
+            """, glyph: "1. 2.",
+                   example: R.mark(R.timedExample(L.melody("\(phraseA) | G4:q E4:q G4:h | E4:q D4:q C4:h"), clef: .treble),
+                                   markers: [R.above(4, "1."), R.above(8, "2.")],
+                                   repeats: [RepeatSpan(start: 0, end: 8)])),
             R.readTimed("Play both endings", "The written-out version: bar 2 is the first ending, bar 4 the second.",
                         L.melody("\(phraseA) | G4:q E4:q G4:h | \(phraseA) | E4:q D4:q C4:h"), bpm: 72, clef: .treble),
             L.quiz("Follow the repeat", """
@@ -584,12 +620,14 @@ extension Curriculum {
             - **Fine** ("the end", say *fee-nay*) — the place where the piece actually stops, even though it is not the last bar on the page.
             - **D.C. al Fine** — go back to the beginning and play until the word *Fine*.
 
-            Written:  A (Fine) | B (D.C. al Fine)
+            The example shows a short piece **as written**: section A (bars 1–2) ends with *Fine*, and section B (bars 3–4) ends with *D.C. al Fine*.
 
             Played:  A, B, A.
 
             Convention: repeat signs are ignored on the way back unless the score says otherwise.
-            """, glyph: "D.C."),
+            """, glyph: "D.C.",
+                   example: R.mark(R.timedExample(L.melody("\(partA) | \(partB)"), bpm: 76, clef: .treble),
+                                   markers: [R.above(6, "Fine"), R.above(14, "D.C. al Fine")])),
             R.readTimed("D.C. al Fine", "Written out as it sounds: section A, section B, then A again, stopping at the Fine.",
                         L.melody("\(partA) | \(partB) | \(partA)"), bpm: 76, clef: .treble),
             L.info("D.S. and the segno", """
@@ -607,10 +645,12 @@ extension Curriculum {
             - play until you reach the words **To Coda** (or the coda sign),
             - then **jump** straight to the coda and play to the end.
 
-            Written:  Intro | (segno) A (To Coda) | B (D.S. al Coda) | (coda sign) Coda
+            The example shows it **as written**, one bar per section: Intro | A (segno at its start, *To Coda* at its end) | B (*D.S. al Coda*) | Coda.
 
             Played:  Intro, A, B, A, Coda.
-            """, glyph: "Coda"),
+            """, glyph: "Coda",
+                   example: R.mark(R.timedExample(L.melody("C4:h G4:h | E4:q G4:q E4:q C4:q | F4:q A4:q G4:q F4:q | D4:q B3:q C4:h"), bpm: 76, clef: .treble),
+                                   markers: [R.above(4, "Segno"), R.above(7, "To Coda"), R.above(10, "D.S. al Coda"), R.above(12, "Coda")])),
             R.readTimed("D.S. al Coda", "Written out as it sounds: Intro, A, B, back to A, then jump to the Coda. One bar each.",
                         L.melody("C4:h G4:h | E4:q G4:q E4:q C4:q | F4:q A4:q G4:q F4:q | E4:q G4:q E4:q C4:q | D4:q B3:q C4:h"),
                         bpm: 76, clef: .treble),
@@ -646,15 +686,22 @@ extension Curriculum {
 
             When the line ends — sometimes marked **loco** ("in place") — play as written again.
 
-            Below is what a passage under 8va actually sounds like when written out honestly: four ledger lines. The 8va version would be written an octave lower, comfortably inside the staff.
-            """, glyph: "8va", example: R.example(R.labeled(L.line("C6 D6 E6 F6 G6")), clef: .treble)),
+            In the example, the first five notes are written comfortably inside the staff under an **8va** sign. \
+            The next five (after *loco*) show the same notes written honestly at the pitch they sound: up to four ledger lines.
+            """, glyph: "8va",
+                   example: R.mark(R.example(R.labeled(L.line("C5 D5 E5 F5 G5 C6 D6 E6 F6 G6")), clef: .treble),
+                                   markers: [R.above(0, "8va"), R.above(5, "loco")])),
             L.info("8vb and 15ma", """
             - **8vb** (*ottava bassa*) **below** the staff: play **one octave lower** than written. Common in the left hand.
             - **15ma** (*quindicesima*) above the staff: play **two octaves higher**. (15, not 16: an octave is 8 notes, and the middle note is counted once.)
             - **15mb** below the staff: two octaves lower.
 
             On a keyboard an octave is the same letter and the same pattern of black keys, 12 keys away.
-            """, glyph: "8vb", keys: L.keys("C3 C4 C5 C6")),
+
+            In the example, the first three notes carry an **8vb** sign; the last three show where they really sound.
+            """, glyph: "8vb", keys: L.keys("C3 C4 C5 C6"),
+                   example: R.mark(R.example(R.labeled(L.line("C4 A3 F3 C3 A2 F2", hand: .left)), clef: .bass),
+                                   markers: [R.below(0, "8vb"), R.below(3, "loco")])),
             R.read("Read the real ledger lines", "First, the hard way: these notes are written at their true pitch.",
                    L.line("G5 A5 B5 C6 D6 E6 D6 C6"), clef: .treble),
             L.quiz("Apply the octave sign", "Each card names the **written** notes and the sign over or under them. Play them where they really sound.",
@@ -717,22 +764,27 @@ extension Curriculum {
             A dynamic stays in force until the next one appears.
 
             On a keyboard, loudness comes from **how fast the key goes down**, not how hard you press afterwards. \
-            Your Launchkey reports this as **velocity** (1–127); watch the velocity meter above the keyboard.
-            """, glyph: "p  f"),
-            R.read("Play piano (p)", "Soft: let the keys go down slowly, fingers close to the keys.", L.line(five), clef: .treble, targets: true, rules: [L.p]),
-            R.read("Play forte (f)", "Loud: a quicker, deeper drop into each key using the weight of your arm — not a stiff hit.", L.line(five), clef: .treble, targets: true, rules: [L.f]),
+            Your Launchkey reports this as **velocity** (1–127); watch the velocity meter above the on-screen keyboard.
+
+            The example is marked **p** at the start and **f** halfway through.
+            """, glyph: "p  f",
+                   example: R.mark(R.example(L.line("C4 D4 E4 F4 G4 F4 E4 D4"), clef: .treble),
+                                   markers: [R.below(0, "p"), R.below(4, "f")])),
+            R.mark(R.read("Play piano (p)", "Soft: let the keys go down slowly, fingers close to the keys.", L.line(five), clef: .treble, targets: true, rules: [L.p]), markers: [R.below(0, "p")]),
+            R.mark(R.read("Play forte (f)", "Loud: a quicker, deeper drop into each key using the weight of your arm — not a stiff hit.", L.line(five), clef: .treble, targets: true, rules: [L.f]), markers: [R.below(0, "f")]),
             L.info("The in-between levels", """
             **mp** and **mf** are the everyday speaking voices of music, and the hardest to tell apart. \
             Think of **mf** as your normal, comfortable tone and **mp** as one notch gentler.
 
             If the app says your notes fall outside the range, look at the average velocity it reports and adjust.
             """, glyph: "mp mf"),
-            R.read("Play mezzo piano (mp)", "Moderately soft.", L.line(five), clef: .treble, targets: true, rules: [L.mp]),
-            R.read("Play mezzo forte (mf)", "Moderately loud: your natural, full tone.", L.line(five), clef: .treble, targets: true, rules: [L.mf]),
-            R.read("Play pianissimo (pp)", "As soft as you can while every note still sounds. This is the hardest dynamic to control.", L.line(five), clef: .treble, targets: true, rules: [L.pp], pass: 0.7),
-            R.read("Play fortissimo (ff)", "Very loud, but never harsh: drop from the arm and stay loose in the wrist.", L.line(five), clef: .treble, targets: true, rules: [L.ff]),
-            R.read("Soft, then loud", "Terraced dynamics: this one checks contrast. Play the first four notes softly and the last four loudly, getting louder overall.",
+            R.mark(R.read("Play mezzo piano (mp)", "Moderately soft.", L.line(five), clef: .treble, targets: true, rules: [L.mp]), markers: [R.below(0, "mp")]),
+            R.mark(R.read("Play mezzo forte (mf)", "Moderately loud: your natural, full tone.", L.line(five), clef: .treble, targets: true, rules: [L.mf]), markers: [R.below(0, "mf")]),
+            R.mark(R.read("Play pianissimo (pp)", "As soft as you can while every note still sounds. This is the hardest dynamic to control.", L.line(five), clef: .treble, targets: true, rules: [L.pp], pass: 0.7), markers: [R.below(0, "pp")]),
+            R.mark(R.read("Play fortissimo (ff)", "Very loud, but never harsh: drop from the arm and stay loose in the wrist.", L.line(five), clef: .treble, targets: true, rules: [L.ff]), markers: [R.below(0, "ff")]),
+            R.mark(R.read("Soft, then loud", "A sudden change: play the first four notes **p** and the last four **f**, as marked. The result card checks that the end is clearly louder than the start.",
                    L.line("C4 D4 E4 F4 G4 A4 B4 C5", fingers: "1 2 3 1 2 3 4 5"), clef: .treble, targets: true, rules: [.crescendo]),
+                   markers: [R.below(0, "p"), R.below(4, "f")]),
         ])
 
         let changes = lesson("reading.expression.changes", "Crescendo, diminuendo, sfz and fp",
@@ -743,28 +795,38 @@ extension Curriculum {
 
             The change is spread evenly across the whole hairpin. The classic mistake is to get loud immediately — \
             start a crescendo **softer than you think**, so you have somewhere to go.
-            """, glyph: "𝆒 𝆓"),
-            R.read("Crescendo", "Start soft and make every note a little louder than the one before.",
+
+            The example grows from **p** to **f** under an opening hairpin, then fades back under a closing one.
+            """, glyph: "𝆒 𝆓",
+                   example: R.mark(R.example(L.line("C4 D4 E4 F4 G4 A4 B4 C5 B4 A4 G4 F4 E4 D4 C4"), clef: .treble),
+                                   markers: [R.below(0, "p"), R.below(1, "cresc<"), R.below(7, "f"),
+                                             R.below(8, "dim>"), R.below(14, "p")])),
+            R.mark(R.read("Crescendo", "Follow the hairpin: start soft and make every note a little louder than the one before.",
                    L.line("C4 D4 E4 F4 G4 A4 B4 C5", fingers: "1 2 3 1 2 3 4 5"), clef: .treble, targets: true, rules: [.crescendo]),
-            R.read("Diminuendo", "Start loud and fade steadily to soft.",
+                   markers: [R.below(0, "p"), R.below(1, "cresc<"), R.below(7, "f")]),
+            R.mark(R.read("Diminuendo", "Follow the closing hairpin: start loud and fade steadily to soft.",
                    L.line("C5 B4 A4 G4 F4 E4 D4 C4", fingers: "5 4 3 2 1 3 2 1"), clef: .treble, targets: true, rules: [.diminuendo]),
+                   markers: [R.below(0, "f"), R.below(1, "dim>"), R.below(7, "p")]),
             L.info("Sudden accents: sfz", """
             **sfz** or **sf** (*sforzando*, "forcing") — a sudden, strong accent on **one note or chord only**. \
             Everything around it stays at the prevailing dynamic.
 
             In the example the third note of each group carries the sfz.
             """, glyph: "sfz",
-                   example: R.example(L.melody("C4:q D4:q E4:q> D4:q C4:q D4:q E4:q> D4:q"), clef: .treble)),
-            R.read("Sforzando", "Play softly, but punch the notes marked with an accent (>). Then drop straight back to soft.",
+                   example: R.mark(R.example(L.melody("C4:q D4:q E4:q> D4:q C4:q D4:q E4:q> D4:q"), clef: .treble),
+                                   markers: [R.below(0, "p"), R.below(2, "sfz"), R.below(6, "sfz")])),
+            R.mark(R.read("Sforzando", "Play softly, but punch the notes marked **sfz**. Then drop straight back to soft.",
                    L.melody("C4:q D4:q E4:q> D4:q C4:q D4:q E4:q> D4:q C4:q"), clef: .treble, targets: true, rules: [.accents(minDiff: 25)]),
+                   markers: [R.below(0, "p"), R.below(2, "sfz"), R.below(6, "sfz")]),
             L.info("Forte-piano: fp", """
             **fp** (*fortepiano*) — attack **loud**, then be **immediately soft**. \
             On a piano a single held note cannot get softer after it is struck, so in practice: the marked note is forte and the notes that follow are suddenly piano.
 
             Related sudden markings: **subito p** ("suddenly soft") and **subito f**.
             """, glyph: "fp"),
-            R.read("Forte-piano", "The first note of each group of four is fp: strike it loud, then play the next three softly.",
+            R.mark(R.read("Forte-piano", "The first note of each group of four is marked **fp**: strike it loud, then play the next three softly.",
                    L.melody("G4:q> E4:q E4:q E4:q A4:q> F4:q F4:q F4:q G4:q> E4:q E4:q E4:q"), clef: .treble, targets: true, rules: [.accents(minDiff: 25)]),
+                   markers: [R.below(0, "fp"), R.below(4, "fp"), R.below(8, "fp")]),
         ])
 
         let articulation = lesson("reading.expression.articulation", "Articulation marks",
@@ -787,7 +849,8 @@ extension Curriculum {
             It is the opposite instruction to staccato.
             """, glyph: "ten."),
             R.read("Tenuto", "Hold every note right up to the moment the next one begins — no gaps at all.",
-                   L.line("C4 E4 D4 F4 E4 G4 F4 D4 C4"), clef: .treble, targets: true, rules: [.legato]),
+                   L.line("C4 E4 D4 F4 E4 G4 F4 D4 C4").map { var e = $0; e.articulation = .tenuto; return e },
+                   clef: .treble, targets: true, rules: [.legato]),
             L.info("Accent and marcato", """
             - **Accent** — a sideways wedge **>** : play this note noticeably louder than its neighbours.
             - **Marcato** — an upright wedge **^** ("marked"): a heavier accent, usually a little detached as well.
@@ -810,27 +873,35 @@ extension Curriculum {
             At the **end** of a slur, lift the hand gently — a small breath before whatever follows.
 
             Do not confuse a slur with a **tie**: a tie joins two notes of the **same pitch** into one longer note that is struck only once.
-            """, glyph: "legato"),
-            R.read("One long slur", "Imagine a single curve over all nine notes. Connect every note to the next.",
+            """, glyph: "legato",
+                   example: R.mark(R.example(L.line("E4 F4 G4 A4 G4 F4 E4"), clef: .treble), slurs: [(0, 6)])),
+            R.mark(R.read("One long slur", "A single slur covers all nine notes. Connect every note to the next.",
                    L.line("C4 D4 E4 F4 G4 F4 E4 D4 C4", fingers: "1 2 3 4 5 4 3 2 1"), clef: .treble, targets: true, rules: [.legato]),
+                   slurs: [(0, 8)]),
             L.info("Two-note slurs", """
             A slur over just two notes has its own gesture: **down–up**. Drop into the first note with a little weight, \
             connect to the second, and play the second **softer and shorter** as the wrist lifts.
-            """),
-            R.read("Slurred thirds, left hand", "Left hand. Smoothly connected throughout.",
+
+            The example shows four two-note slurs. Listen for the tiny lift after each pair.
+            """, example: R.mark(R.timedExample(L.melody("G4:q E4:e r:e A4:q F4:e r:e | G4:q E4:e r:e F4:q D4:e r:e"), bpm: 80, clef: .treble),
+                                 slurs: [(0, 1), (2, 3), (4, 5), (6, 7)])),
+            R.mark(R.read("Slurred thirds, left hand", "Left hand. One slur over the whole line: smoothly connected throughout.",
                    L.line("C3 E3 D3 F3 E3 G3 F3 D3 C3", hand: .left, fingers: "5 3 4 2 3 1 2 4 5"), clef: .bass, targets: true, rules: [.legato]),
+                   slurs: [(0, 8)]),
             L.info("Phrase marks", """
             A longer curve spanning several bars is a **phrase mark**. It shows a complete musical thought, like a sentence.
 
             - Play the whole phrase connected, with one overall shape — usually growing toward the middle and relaxing at the end.
             - Between phrases, **lift**: singers and wind players breathe there, and pianists should too.
 
-            Next you will play two four-note phrases. Connect within each phrase, and lift between them.
+            Next you will play two five-note phrases, each under its own curve. Connect within each phrase, and lift between them.
             """),
-            R.read("Two phrases", "Phrase 1 is C D E F G, phrase 2 is A G F E C. Connect inside each phrase; lift your hand between them.",
+            R.mark(R.read("Two phrases", "Phrase 1 is C D E F G, phrase 2 is A G F E C. Connect inside each phrase; lift your hand where one curve ends and the next begins.",
                    L.line("C4 D4 E4 F4 G4 A4 G4 F4 E4 C4"), clef: .treble, targets: true, rules: [.legato]),
-            R.read("Shape the phrase", "One phrase: connected, and getting louder toward the top note.",
+                   slurs: [(0, 4), (5, 9)]),
+            R.mark(R.read("Shape the phrase", "One phrase under one curve: connected, and getting louder toward the top note.",
                    L.line("C4 D4 E4 F4 G4 A4 B4 C5", fingers: "1 2 3 1 2 3 4 5"), clef: .treble, targets: true, rules: [.legato, .crescendo]),
+                   markers: [R.below(0, "p"), R.below(1, "cresc<"), R.below(7, "f")], slurs: [(0, 7)]),
         ])
         return unit("reading.expression", "Dynamics and articulation", [dynamics, changes, articulation, slurs])
     }
@@ -844,7 +915,7 @@ extension Curriculum {
             An **ornament** is a small sign above a note that stands for several quick notes. \
             Composers use them because writing out every tiny note would clutter the page.
 
-            To learn each sign, this app shows the **realisation** — the notes you actually play — written out in full.
+            For each sign, the examples show the note **as written** with its ornament sign, followed by the **realisation** — the notes you actually play — written out in full.
             """, glyph: "tr"),
             L.info("The trill", """
             **tr** above a note (often followed by a wavy line): alternate rapidly between the **written note** and the **note above it** in the key, for the full length of the note.
@@ -852,9 +923,10 @@ extension Curriculum {
             - In music from about 1800 onward, start on the **written note**.
             - In Baroque and early Classical music (Bach, Mozart), trills usually start on the **upper note**.
 
-            A trill on C lasting two beats, realised in sixteenth notes, then landing on a held C:
+            Bar 1 shows a trill on C **as written**. Bar 2 is the realisation: sixteenth notes for two beats, landing on a held C.
             """, glyph: "tr",
-                   example: R.timedExample(L.melody("C5:s D5:s C5:s D5:s C5:s D5:s C5:s D5:s C5:h"), bpm: 60, clef: .treble)),
+                   example: R.timedExample(R.ornamented("C5:h", .trill)
+                                           + L.melody("C5:s D5:s C5:s D5:s C5:s D5:s C5:s D5:s C5:h", start: 4), bpm: 60, clef: .treble)),
             R.read("Trill, slowly", "Fingers 2 and 3. Alternate C and D evenly; stay loose and close to the keys.",
                    L.line("C5 D5 C5 D5 C5 D5 C5 D5 C5", fingers: "2 3 2 3 2 3 2 3 2"), clef: .treble, targets: true, rules: [.evenVelocity(maxStdDev: 14)]),
             R.readTimed("Trill in time", "Four notes per click, then hold the last C. If it is too fast, lower the tempo.",
@@ -866,8 +938,11 @@ extension Curriculum {
             - **Upper mordent** (also called an inverted mordent or *Pralltriller*) — the short zigzag **without** the stroke: written note → note **above** → written note. On C: C–D–C.
 
             Unlike a trill, a mordent happens once and then the main note is held.
+
+            Bar 1 shows a mordent on C **as written**. Bar 2 is the realisation of the lower mordent (C–B–C), then of the upper mordent (C–D–C).
             """, glyph: "C-B-C",
-                   example: R.timedExample(L.melody("C5:t B4:t C5:q.. C5:t D5:t C5:q.."), bpm: 60, clef: .treble)),
+                   example: R.timedExample(R.ornamented("C5:h", .mordent)
+                                           + L.melody("C5:t B4:t C5:q.. C5:t D5:t C5:q..", start: 4), bpm: 60, clef: .treble)),
             R.read("Lower mordent", "Each group is main note – note below – main note. Play each group as one quick gesture.",
                    L.line("C5 B4 C5 E5 D5 E5 G5 F5 G5", fingers: "3 2 3 3 2 3 3 2 3"), clef: .treble, targets: true),
             R.read("Upper mordent", "Main note – note above – main note.",
@@ -884,8 +959,11 @@ extension Curriculum {
             A turn on C: **D – C – B – C**.
 
             If the sign sits directly **over** the note, the turn starts on the beat. If it sits **between** two notes, play the first note, then fit the turn in just before the next one.
+
+            Bar 1 shows a turn on C **as written**, moving on to E. Bar 2 is the realisation.
             """, glyph: "turn",
-                   example: R.timedExample(L.melody("D5:s C5:s B4:s C5:s E5:h r:q"), bpm: 60, clef: .treble)),
+                   example: R.timedExample(R.ornamented("C5:q", .turn) + L.melody("E5:h", start: 1)
+                                           + L.melody("D5:s C5:s B4:s C5:s E5:h", start: 4), bpm: 60, clef: .treble)),
             R.read("Turn, slowly", "Turns on C, then on E, then on G: above, main, below, main.",
                    L.line("D5 C5 B4 C5 F5 E5 D5 E5 A5 G5 F5 G5", fingers: "4 3 2 3 4 3 2 3 4 3 2 3"), clef: .treble, targets: true),
             R.readTimed("Turn in time", "A turn on beat 1 leading to a held E, twice.",
@@ -897,8 +975,11 @@ extension Curriculum {
             Play it as quickly as possible, squeezed in right before (or right on) the beat, so the main note still lands in time.
 
             Think of it as a flick: the two keys go down almost — but not quite — together.
+
+            Bar 1 shows two notes **as written**, each with a grace note. Bar 2 is the realisation: a crushed note a step below, flicked in just before each beat.
             """, glyph: "note:e note:q",
-                   example: R.timedExample(L.melody("r:e.. B4:t C5:q r:e.. D5:t E5:q"), bpm: 60, clef: .treble)),
+                   example: R.timedExample(R.ornamented("r:q C5:q r:q E5:q", .acciaccatura)
+                                           + L.melody("r:e.. B4:t C5:q r:e.. D5:t E5:q", start: 4), bpm: 60, clef: .treble)),
             R.read("Acciaccatura", "Each pair is a crushed grace note and its main note. Flick the first and land on the second.",
                    L.line("B4 C5 D5 E5 F#5 G5 B5 C6", fingers: "2 3 2 3 2 3 2 3"), clef: .treble, targets: true),
             L.info("The appoggiatura", """
@@ -908,8 +989,11 @@ extension Curriculum {
             It leans on the main note: play the appoggiatura a little stronger and resolve softly onto the main note.
 
             Written: small D before a half note C.  Played: D quarter, C quarter.
+
+            Bar 1 shows two half notes **as written**, each with an appoggiatura. Bar 2 is the realisation: the leaning note takes the first half of each.
             """, glyph: "note:q note:h",
-                   example: R.timedExample(L.melody("D5:q> C5:q F5:q> E5:q | A5:q> G5:q D5:q> C5:q"), bpm: 66, clef: .treble)),
+                   example: R.timedExample(R.ornamented("C5:h E5:h", .appoggiatura)
+                                           + L.melody("D5:q> C5:q F5:q> E5:q", start: 4), bpm: 66, clef: .treble)),
             R.readTimed("Appoggiatura", "Each pair is an appoggiatura (accented, on the beat) resolving to its main note. Lean, then relax.",
                         L.melody("D5:q> C5:q F5:q> E5:q | A5:q> G5:q D5:q> C5:q"), bpm: 66, clef: .treble, rules: [.accents(minDiff: 10)]),
         ])
@@ -933,7 +1017,11 @@ extension Curriculum {
             A small upward notch (like an inverted V) in the line means **change**: lift and immediately press again.
 
             Other words: **con pedale** / **con ped.** — use the pedal as your ear suggests; **senza ped.** — without pedal; **una corda** — the left (soft) pedal; **tre corde** — release it.
-            """, glyph: "Ped. *"),
+
+            The example shows four chords with a **Ped.** marking under each: a fresh pedal for every chord.
+            """, glyph: "Ped. *",
+                   example: R.mark(R.example(L.chords(pedalChords), clef: .treble),
+                                   markers: [R.below(0, "Ped."), R.below(1, "Ped."), R.below(2, "Ped."), R.below(3, "Ped.")])),
             L.info("Legato pedalling", """
             The essential technique is the **pedal change**. The foot does **not** move with the hands:
 
@@ -942,10 +1030,12 @@ extension Curriculum {
 
             Hands down, foot up–down. "Play… change. Play… change." If you lift the pedal *before* the chord you get a gap; if you never lift you get a blur.
             """),
-            R.read("Change the pedal on each chord", "Press the pedal, then play the four chords. Just **after** each new chord sounds, lift the pedal and press it again.",
-                   L.chords(pedalChords, labels: ["Ped.", "change", "change", "change"]), clef: .treble, targets: true, rules: [.pedalChange]),
-            R.read("Pedalled bass notes", "Left hand, one note at a time, far apart. The pedal joins them: change it just after each note.",
+            R.mark(R.read("Change the pedal on each chord", "Press the pedal, then play the four chords. At each new **Ped.** marking, play the chord first, then lift the pedal and press it again straight away.",
+                   L.chords(pedalChords), clef: .treble, targets: true, rules: [.pedalChange]),
+                   markers: [R.below(0, "Ped."), R.below(1, "Ped."), R.below(2, "Ped."), R.below(3, "Ped.")]),
+            R.mark(R.read("Pedalled bass notes", "Left hand, one note at a time, far apart. The pedal joins them: change it just after each note.",
                    L.line("C3 G2 A2 F2 G2 C3", hand: .left), clef: .bass, targets: true, rules: [.pedalChange]),
+                   markers: (0..<6).map { R.below(Double($0), "Ped.") }),
         ])
 
         let fingering = lesson("reading.ornaments.fingering", "Fingering numbers in the score",
@@ -1024,7 +1114,7 @@ extension Curriculum {
             - **Jump back in on the next downbeat** — the first note after a bar line.
             - Play only the **first note of each bar** until you recover.
 
-            Dropping notes to stay in time is the correct choice, every time.
+            Dropping notes to stay in time is the correct choice, every time. (The **Wait for me** option under a timed task is for learning pieces. Leave it off here: sight-reading means the beat does not wait.)
             """),
             R.readTimed("Level 2 — skips and half notes", "Now there are skips (line to line, space to space) across a full octave. Your hand may need to shift.",
                         R.phrase(cOct, "q q h | q q q q | h q q | h. rq", maxLeap: 2), bpm: 63, clef: .treble),
@@ -1239,16 +1329,18 @@ extension Curriculum {
             The simplest way to play a lead sheet: **right hand melody, left hand chord**, struck on the first beat of each bar and held. \
             Keep the left hand low and compact (around the C below middle C) so it stays out of the melody's way.
             """),
-            R.readTimed("Step 1 — the melody", "The tune is Beethoven's \"Ode to Joy\". Read the melody alone first.",
+            R.mark(R.readTimed("Step 1 — the melody", "The tune is Beethoven's \"Ode to Joy\", laid out like a lead sheet: melody on the staff, chord symbols above. Read the melody alone first.",
                         L.melody(odeMelody), bpm: 72, clef: .treble),
+                   markers: [R.above(0, "C"), R.above(4, "G7"), R.above(8, "C"), R.above(12, "G")]),
             L.quiz("Step 2 — the chords", "These are the four chords of the tune, in order: one per bar. Play each with your left hand (any octave).", rounds: 4) { round in
                 let types: [ChordType] = [.major, .dom7, .major, .major]
                 let roots = [0, 7, 0, 7]
                 return R.chordCard(roots[round % 4], types[round % 4])
             },
-            R.readTimed("Step 3 — melody and chords", "The chord symbols are printed under the staff. Left hand plays each chord on beat 1 and holds it for the whole bar.",
-                        L.together(L.chords(odeChords, hand: .left, duration: 4, labels: odeLabels), L.melody(odeMelody)),
+            R.mark(R.readTimed("Step 3 — melody and chords", "The chord symbols are printed above the staff. Left hand plays each chord on beat 1 and holds it for the whole bar. If it falls apart, practise with **Left hand** or **Right hand** alone, or turn on **Wait for me**, then come back to both.",
+                        L.together(L.chords(odeChords, hand: .left, duration: 4), L.melody(odeMelody)),
                         bpm: 63, clef: .grand, pass: 0.7),
+                   markers: zip([0.0, 4, 8, 12], odeLabels).map { R.above($0.0, $0.1) }),
             L.info("Where to go from here", """
             Once block chords feel easy, vary the left hand without changing the harmony:
 

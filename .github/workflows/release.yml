@@ -1,0 +1,36 @@
+# Builds Piano Coach.app and attaches it to a GitHub release when a version tag is pushed.
+# The app is ad-hoc signed, not notarized: after downloading, right-click the app and choose Open the first time.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and check
+        run: |
+          swift build
+          .build/debug/PianoCoach --check
+          .build/debug/PianoCoach --selftest
+      - name: Package app
+        run: |
+          scripts/build-app.sh
+          cd build && ditto -c -k --keepParent "Piano Coach.app" PianoCoach.zip
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: PianoCoach
+          path: build/PianoCoach.zip
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" build/PianoCoach.zip --title "Piano Coach $GITHUB_REF_NAME" --generate-notes

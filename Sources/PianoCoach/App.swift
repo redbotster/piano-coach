@@ -56,7 +56,13 @@ enum Main {
             MainActor.assumeIsolated { Snapshot.render(to: args[i + 1], lessonID: args.count > i + 2 ? args[i + 2] : nil) }
             exit(0)
         }
-        if args.contains("--selftest") { exit(SelfTest.run() ? 0 : 1) }
+        if args.contains("--selftest") {
+            let engine = SelfTest.run()
+            let importer = SongImport.selfTest()
+            let plan = PracticePlan.selfTest()
+            let profiles = ProfileStore.selfTest()
+            exit(engine && importer && plan && profiles ? 0 : 1)
+        }
         if let i = args.firstIndex(of: "--icon"), args.count > i + 1 {
             MainActor.assumeIsolated { Snapshot.renderIcon(to: args[i + 1]) }
             exit(0)

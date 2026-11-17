@@ -79,6 +79,22 @@ enum SelfTest {
             expect(runner.statuses[5] == .missed, "missed note is marked")
         }
 
+        // 3b. Wait mode: a timed task that pauses on each note, no clock.
+        do {
+            let task = L.timedTask("t", "", L.melody("C4:q D4:e E4:e F4:h"), bpm: 120)
+            let runner = TaskRunner(task: task, waitMode: true)
+            expect(runner.phase == .running && !runner.timedRun, "wait mode needs no Start")
+            var t = HostClock.now()
+            for note in [60, 62, 64, 65] {
+                runner.noteOn(note, velocity: 80, time: t)
+                runner.noteOff(note, time: t + 0.1)
+                t += 2.0   // far slower than the tempo: must not matter
+            }
+            spin(0.8)
+            expect(runner.result?.accuracy == 1 && runner.result?.meanAbsDeviationMs == nil, "wait mode scores notes, not timing")
+            expect(abs(runner.clock.beat - task.totalBeats) < 0.01, "wait mode playhead reaches the end")
+        }
+
         // 4. Polyrhythm 3 against 2, hands matched separately.
         do {
             let right = L.rhythm("3q 3q 3q 3q 3q 3q", note: 72, hand: .right, count: false)

@@ -270,7 +270,7 @@ extension Curriculum {
                         ]),
             L.play("Drop and release", "With finger 3 of the right hand, **drop** your arm weight into each lit key, let the wrist float up as you release, then drop into the next. Slow and heavy.",
                    L.line("C4 E4 G4 E4 C4", fingers: "3 3 3 3 3")),
-            L.play("Weight makes a full sound", "Play the five notes with relaxed arm weight. Aim for a full, round **mf** — the velocity meter under the lesson should read about 60–90.",
+            L.play("Weight makes a full sound", "Play the five notes with relaxed arm weight. Aim for a full, round **mf**: the Velocity meter above the on-screen keyboard should read about 60–90.",
                    fingered(L.line(upDown(cRight)), position: cRight, hand: .right), rules: [L.mf]),
             L.play("Light arm, soft sound", "Now let less weight fall: play the same notes softly (**p**, velocity about 25–58). Stay just as relaxed — soft does not mean tense.",
                    fingered(L.line(upDown(cRight)), position: cRight, hand: .right), rules: [L.p]),
@@ -340,7 +340,7 @@ extension Curriculum {
         let melodies = lesson("foundations.first.melodies", "Single-hand melodies",
                               "Real tunes in C position, one hand at a time.", [
             L.info("From exercises to music",
-                   "You can already play real melodies: plenty of tunes fit inside the five notes under your hand.\n\nEach tune appears twice. First **untimed** — the lesson waits for every note, so take your time finding the keys. Then **with the metronome**, where the music keeps moving. Press **Demo** to hear a tune first.\n\nThe blocks in the timeline show how long each note lasts: longer block, longer note. Hold each key down for the full length of its block.",
+                   "You can already play real melodies: plenty of tunes fit inside the five notes under your hand.\n\nEach tune appears twice. First **untimed** — the lesson waits for every note, so take your time finding the keys. Then **with the metronome**, where the music keeps moving. Press **Demo** to hear a tune first. If the metronome version runs away from you, lower the tempo with **BPM −** or turn on **Wait for me**.\n\nThe blocks in the timeline show how long each note lasts: longer block, longer note. Hold each key down for the full length of its block.",
                    keys: L.keys(cR, labels: ["C", "D", "E", "F", "G"], hand: .right)),
             L.play("Hot Cross Buns — find the notes", "Right hand in C position. Follow the lit keys and finger numbers.", buns, display: .staff),
             L.timed("Hot Cross Buns — in time", "Now with the metronome. The quick notes in bar 3 go two to a click.", buns,
@@ -436,7 +436,7 @@ extension Curriculum {
             L.quiz("Follow the lights — left hand", "The same with the left hand.", rounds: 5) { _ in
                 L.task("Left hand", "", randomRun(cL, hand: .left, count: 8))
             },
-            L.quiz("Finger numbers only", "No lights now — only finger numbers on the staff. Right hand in C position: play the finger numbers shown.", rounds: 5) { _ in
+            L.quiz("Finger numbers only", "No lights now, only the notes and finger numbers on the staff. Right hand in C position: play the finger numbers shown.", rounds: 5) { _ in
                 L.task("Read the fingering", "", randomRun(cR, hand: .right, count: 6), display: .staff, showTargets: false)
             },
             L.timed("Accuracy in time", "A longer pattern with the metronome. Aim for 100% with no wrong notes.",
@@ -451,8 +451,8 @@ extension Curriculum {
         let evenness = lesson("foundations.midi.evenness", "Even velocity",
                               "Make every finger sound equally strong.", [
             L.info("Why notes come out uneven",
-                   "Your fingers are not equally strong. The thumb is heavy, fingers 4 and 5 are weak, so a simple five-note pattern often comes out *LOUD-loud-loud-soft-soft*.\n\nThe app shows this as **velocity evenness**: how much your key speed varied from note to note (shown as ±). Beginners often vary by ±15 or more; a controlled, even touch is **±10 or less**, and very polished playing gets under ±6.\n\nTo even things out: play the thumb **lighter** than feels natural, and give fingers 4 and 5 a little more arm weight behind them. The velocity bar beside the keyboard shows each note as you play."),
-            L.play("Baseline", "Play C position up and down at a comfortable medium loudness. This one only measures — see what your evenness number is.",
+                   "Your fingers are not equally strong. The thumb is heavy, fingers 4 and 5 are weak, so a simple five-note pattern often comes out *LOUD-loud-loud-soft-soft*.\n\nThe app shows this as **velocity evenness**: how much your key speed varied from note to note (shown as ±). Beginners often vary by ±15 or more; a controlled, even touch is **±10 or less**, and very polished playing gets under ±6.\n\nTo even things out: play the thumb **lighter** than feels natural, and give fingers 4 and 5 a little more arm weight behind them. The Velocity meter above the on-screen keyboard shows each note's value as you play."),
+            L.play("Baseline", "Play C position up and down at a comfortable medium loudness. This one is mostly a measurement (anything under ±18 passes): see what your evenness number is.",
                    rLine, rules: [.evenVelocity(maxStdDev: 18)]),
             L.play("Even touch, right hand", "Again, listening closely. Thumb lighter, little finger firmer. Target: ±12 or less.",
                    rLine + fingered(L.line(upDown(cR), start: 9), position: cR, hand: .right), rules: [.evenVelocity(maxStdDev: 12)]),

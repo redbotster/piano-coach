@@ -24,6 +24,19 @@ fileprivate enum TC {
         fingers.map { "\($0)" }.joined(separator: " ")
     }
 
+    /// Correct spellings of the raised 7th (harmonic/melodic minor) and raised 6th (melodic minor), by tonic.
+    static let raisedSeventh = [0: "B♮", 1: "B♯", 2: "C♯", 3: "D♮", 4: "D♯", 5: "E♮", 6: "E♯", 7: "F♯", 8: "F𝄪", 9: "G♯", 10: "A♮", 11: "A♯"]
+    static let raisedSixth = [0: "A♮", 1: "A♯", 2: "B♮", 3: "C♮", 4: "C♯", 5: "D♮", 6: "D♯", 7: "E♮", 8: "E♯", 9: "F♯", 10: "G♮", 11: "G♯"]
+    /// Where the correct spelling differs from the everyday name of the key: what the key (and this app's staff) shows instead.
+    static let everydayName = ["B♯": "C", "E♯": "F", "F𝄪": "G"]
+
+    static func enharmonicNote(_ names: [String]) -> String {
+        let odd = names.filter { everydayName[$0] != nil }
+        guard !odd.isEmpty else { return "" }
+        let parts = odd.map { "**\($0)** is the white key you normally call \(everydayName[$0]!)" }
+        return "\n\n" + parts.joined(separator: ", and ") + ". The lit key is labelled with its proper name; the staff in this app shows it as a natural (\(odd.map { everydayName[$0]! + "♮" }.joined(separator: ", ")))."
+    }
+
     static func minorKey(_ pc: Int) -> Int { pc == 3 ? -6 : Music.fifths(minorTonicPC: pc) }
 
     static func signature(_ key: Int) -> String {
@@ -35,11 +48,27 @@ fileprivate enum TC {
 
     static func upDown(_ up: [Int]) -> [Int] { up + up.dropLast().reversed() }
 
+    /// One slur over the whole line (drawn on the staff).
+    static func slurred(_ events: [ExpectedEvent]) -> [ExpectedEvent] {
+        var out = events
+        guard out.count > 1 else { return out }
+        out[0].slurStart = true
+        out[out.count - 1].slurEnd = true
+        return out
+    }
+
     /// A scale with its standard fingering attached.
     static func run(_ root: Int, _ type: ScaleType, hand: Hand, octaves: Int = 1, descend: Bool = true,
                     duration: Double = 1) -> [ExpectedEvent] {
         let notes = Music.scale(root: root, type: type, octaves: octaves, descend: descend)
-        let fingers = Fingering.scaleRun(tonicPC: Music.pc(root), type: type, hand: hand, octaves: octaves, descend: descend)
+        var fingers = Fingering.scaleRun(tonicPC: Music.pc(root), type: type, hand: hand, octaves: octaves, descend: descend)
+        // The F shape (1 2 3 4 1 2 3 4): inside a longer run the key-note is a thumb; finger 4 is only for the very top.
+        if hand != .left, octaves > 1, var f = fingers,
+           let one = Fingering.scale(tonicPC: Music.pc(root), type: type, hand: hand), one.first == 1, one.last == 4 {
+            let top = notes.max() ?? root
+            for i in notes.indices where Music.pc(notes[i]) == Music.pc(root) && notes[i] != top { f[i] = 1 }
+            fingers = f
+        }
         return L.line(notes, hand: hand, fingers: fingers, duration: duration)
     }
 
@@ -50,7 +79,8 @@ fileprivate enum TC {
         let one = Fingering.scale(tonicPC: Music.pc(root), type: .melodicMinor, hand: hand)
         // C♯ and F♯ melodic minor: the raised 6th is a black key, so the right hand regroups on the way up.
         let regroup = hand != .left && [1, 6].contains(Music.pc(root))
-        let rising: [Int]? = regroup ? [2, 3, 1, 2, 3, 4, 1, 2] : one
+        // The top note takes finger 3 so the descent (natural minor) can start 3 2 1.
+        let rising: [Int]? = regroup ? [2, 3, 1, 2, 3, 4, 1, 3] : one
         var fingers: [Int]? = nil
         if let rising, let one { fingers = rising + one.dropLast().reversed() }
         return L.line(up + down, hand: hand, fingers: fingers, duration: duration)
@@ -160,9 +190,8 @@ extension Curriculum {
         steps.append(L.play("Left-hand weak fingers", "The same workout for left-hand fingers 5, 4 and 3.",
                             L.line("C3 D3 E3 D3 C3 D3 E3 D3 C3 D3 E3 D3 C3", hand: .left, fingers: "5 4 3 4 5 4 3 4 5 4 3 4 5"),
                             rules: [.evenVelocity(maxStdDev: 12)]))
-        let pattern = L.together(
-            L.line("C4 E4 D4 F4 E4 G4 F4 D4 C4 E4 D4 F4 E4 G4 F4 D4", hand: .right, fingers: "1 3 2 4 3 5 4 2 1 3 2 4 3 5 4 2", duration: 0.5),
-            [])
+        let pattern = L.line("C4 E4 D4 F4 E4 G4 F4 D4 C4 E4 D4 F4 E4 G4 F4 D4", hand: .right,
+                             fingers: "1 3 2 4 3 5 4 2 1 3 2 4 3 5 4 2", duration: 0.5)
         steps.append(L.timed("Even eighth notes", "Play the skipping pattern as steady eighth notes (two per click). Every note the same loudness.",
                              pattern + L.line("C4", hand: .right, fingers: "1", duration: 1, start: 8),
                              bpm: 66, display: .staffAndRhythm, clef: .treble, rules: [.evenVelocity(maxStdDev: 12)]))
@@ -175,8 +204,8 @@ extension Curriculum {
         steps.append(L.info("Running out of fingers", """
             A scale has more notes than you have fingers. The solution is a **crossing**:
 
-            - **Thumb under**: going away from the thumb side (right hand rising, left hand falling), the thumb slides under the hand to take the next key.
-            - **Finger over**: going the other way, finger 3 (or 4) swings over the thumb.
+            - **Thumb under**: when the right hand climbs or the left hand descends, the thumb slides under the hand to take the next key.
+            - **Finger over**: going the other way (right hand descending, left hand climbing), finger 3 or 4 swings over the thumb.
 
             Start moving the thumb early — as soon as finger 2 plays, the thumb is already travelling under. Keep the wrist level and the elbow quiet; the hand should not twist or bump.
             """, keys: L.keys(Music.notes("C4 D4 E4 F4"), labels: ["1", "2", "3", "1"], hand: .right)))
@@ -204,9 +233,11 @@ extension Curriculum {
         steps.append(L.info("Legato: joined notes", """
             **Legato** means smooth and connected. One finger goes down exactly as the previous one comes up, like walking — there is always one foot on the ground.
 
+            In the score, legato is shown by a **slur**: a curved line over the notes.
+
             The app measures the gap between releasing one key and pressing the next. For legato there should be no gap at all; a tiny overlap is fine.
             """, glyph: "legato",
-            example: L.timedTask("Legato", "", L.line("C4 D4 E4 F4 G4", hand: .right, duration: 1), bpm: 90, display: .staff)))
+            example: L.timedTask("Legato", "", TC.slurred(L.line("C4 D4 E4 F4 G4", hand: .right, duration: 1)), bpm: 90, display: .staff)))
         steps.append(L.play("Legato, right hand", "Play up and down, handing each note to the next with no silence between them.",
                             L.line("C4 D4 E4 F4 G4 F4 E4 D4 C4", hand: .right, fingers: "1 2 3 4 5 4 3 2 1"), rules: [.legato]))
         steps.append(L.play("Legato, left hand", "The same in the left hand.",
@@ -227,8 +258,8 @@ extension Curriculum {
         for i in staccatoLeft.indices { staccatoLeft[i].articulation = .staccato }
         steps.append(L.play("Staccato, left hand", "Short and light in the left hand.", staccatoLeft, rules: [.staccato]))
         steps.append(L.timed("Legato with the metronome", "One note per click, perfectly joined.",
-                             L.line("C4 D4 E4 F4 G4 F4 E4 D4 C4 D4 E4 F4 G4 F4 E4 D4", hand: .right,
-                                    fingers: "1 2 3 4 5 4 3 2 1 2 3 4 5 4 3 2"),
+                             TC.slurred(L.line("C4 D4 E4 F4 G4 F4 E4 D4 C4 D4 E4 F4 G4 F4 E4 D4", hand: .right,
+                                               fingers: "1 2 3 4 5 4 3 2 1 2 3 4 5 4 3 2")),
                              bpm: 80, display: .staffAndRhythm, clef: .treble, rules: [.legato]))
         var timedStaccato = L.line("C4 D4 E4 F4 G4 F4 E4 D4 C4 D4 E4 F4 G4 F4 E4 D4", hand: .right,
                                    fingers: "1 2 3 4 5 4 3 2 1 2 3 4 5 4 3 2")
@@ -248,6 +279,8 @@ extension Curriculum {
             - Then combine at half speed. Think of the two hands as one event: "together, together, right, together".
             - Look for where the hands land **at the same time** and where one moves alone.
             - If it falls apart, the tempo is too fast. Slow down rather than repeat mistakes.
+
+            The timed tasks give you three helpers: **Right hand / Left hand / Both** (the app plays the hand you leave out), **Wait for me** (the music pauses until you find each note), and **Loop bars** (repeat a tricky bar, speeding up as you get it clean).
             """))
         steps.append(L.play("Same notes, both hands", "Both hands play C D E F G together, an octave apart. Notice the fingers are mirrored: right hand 1 2 3 4 5, left hand 5 4 3 2 1.",
                             L.together(L.line("C4 D4 E4 F4 G4 F4 E4 D4 C4", hand: .right, fingers: "1 2 3 4 5 4 3 2 1"),
@@ -265,7 +298,7 @@ extension Curriculum {
                              L.together(L.melody("C4:q:1 D4:q:2 E4:q:3 F4:q:4 r:w G4:q:5 F4:q:4 E4:q:3 D4:q:2 r:w", hand: .right),
                                         L.melody("r:w G3:q:1 F3:q:2 E3:q:3 D3:q:4 r:w C3:h:5 C3:h:5", hand: .left)),
                              bpm: 76, display: .staffAndRhythm))
-        steps.append(L.timed("Ode to Joy, hands together", "Beethoven's tune in the right hand over two slow left-hand notes per bar. Hands separately first if you need to — use Demo to hear it.",
+        steps.append(L.timed("Ode to Joy, hands together", "Beethoven's tune in the right hand over two slow left-hand notes per bar. Press **Demo** to hear it. To learn the hands separately, choose **Right hand** or **Left hand** under the task and the app plays the other part.",
                              L.together(
                                 L.melody("E4:q:3 E4:q:3 F4:q:4 G4:q:5 G4:q:5 F4:q:4 E4:q:3 D4:q:2 C4:q:1 C4:q:1 D4:q:2 E4:q:3 E4:q.:3 D4:e:2 D4:h:2", hand: .right),
                                 L.melody("C3:h:5 G3:h:1 C3:h:5 G3:h:1 C3:h:5 G3:h:1 C3:h:5 G3:h:1", hand: .left)),
@@ -324,11 +357,12 @@ extension Curriculum {
         let rhFingers = Fingering.scale(tonicPC: pc, type: .major, hand: .right) ?? []
         let lhFingers = Fingering.scale(tonicPC: pc, type: .major, hand: .left) ?? []
         let octave = Music.scale(root: hi, type: .major)
-        let labels = TC.names(octave, flats: flats)
+        var labels = TC.names(octave, flats: flats)
+        if pc == 6 { labels[6] = "E♯" }
         let rhThumbs = zip(labels, rhFingers).filter { $0.1 == 1 }.map { $0.0 }.joined(separator: " and ")
         let lhThumbs = zip(labels, lhFingers).filter { $0.1 == 1 }.map { $0.0 }.joined(separator: " and ")
         var extra = ""
-        if pc == 6 { extra = "\n\nThe seventh note is written **E♯** on the staff. It is the white key you usually call F." }
+        if pc == 6 { extra = "\n\nThe seventh note is **E♯**. It is the white key you usually call F — in this key every letter name is used once, so it has to be some kind of E." }
         if !Music.isBlack(pc) && key != 0 && rhFingers == [1, 2, 3, 1, 2, 3, 4, 5] {
             extra += "\n\nThe fingering is the same as C major — only the black keys change."
         }
@@ -349,13 +383,13 @@ extension Curriculum {
                             TC.run(hi, .major, hand: .right), display: .staff, clef: .treble, key: key, flats: flats))
         steps.append(L.play("Left hand", "Up and down one octave with the left hand.",
                             TC.run(lo, .major, hand: .left), display: .staff, clef: .bass, key: key, flats: flats))
-        steps.append(L.play("Hands together", "Both hands, an octave apart. Go slowly: the crossings happen at different moments in each hand.",
+        steps.append(L.play("Hands together", "Both hands, an octave apart. Go slowly — the lesson waits for you. The crossings happen at different moments in each hand.",
                             L.together(TC.run(hi, .major, hand: .right), TC.run(lo, .major, hand: .left)),
                             display: .staff, key: key, flats: flats))
-        steps.append(L.timed("Hands together with the metronome", "One note per click. Lower the tempo if you need to — clean and slow beats fast and messy.",
+        steps.append(L.timed("Hands together with the metronome", "One note per click. If the hands tangle, choose **Right hand** or **Left hand** under the task (the app plays the other part) or switch on **Wait for me**. Lower the tempo with BPM − if you need to — clean and slow beats fast and messy.",
                              L.together(TC.run(hi, .major, hand: .right), TC.run(lo, .major, hand: .left)),
                              bpm: 66, display: .staff, key: key, flats: flats))
-        steps.append(L.timed("Two octaves, even eighth notes", "Right hand, two octaves, two notes per click. Every note should be equally loud. When this is easy, raise the tempo a notch.",
+        steps.append(L.timed("Two octaves, even eighth notes", "Right hand, two octaves, two notes per click. Every note should be equally loud. If one bar keeps tripping you, use **Loop bars** on it. When the whole run is easy, raise the tempo a notch with BPM +.",
                              TC.run(hi, .major, hand: .right, octaves: 2, duration: 0.5),
                              bpm: 72, display: .staff, clef: .treble, key: key, flats: flats,
                              rules: [.evenVelocity(maxStdDev: 12)]))
@@ -379,11 +413,17 @@ extension Curriculum {
         let natural = Music.scale(root: hi, type: .naturalMinor)
         let harmonic = Music.scale(root: hi, type: .harmonicMinor)
         let melodic = Music.scale(root: hi, type: .melodicMinor)
-        let labels = TC.names(natural, flats: flats)
+        var labels = TC.names(natural, flats: flats)
+        if pc == 3 { labels[5] = "C♭" }
         let rhFingers = Fingering.scale(tonicPC: pc, type: .naturalMinor, hand: .right) ?? []
         let lhFingers = Fingering.scale(tonicPC: pc, type: .naturalMinor, hand: .left) ?? []
-        let seventh = Music.name(harmonic[6], flats: false, octave: false)
-        let sixth = Music.name(melodic[5], flats: false, octave: false)
+        let seventh = TC.raisedSeventh[pc] ?? Music.name(harmonic[6], flats: false, octave: false)
+        let sixth = TC.raisedSixth[pc] ?? Music.name(melodic[5], flats: false, octave: false)
+        let regrouped = [1, 6].contains(pc)
+        let fingeringNote = regrouped
+            ? "This fingering serves the natural and harmonic forms. Going up the melodic minor, the right hand regroups to **2 3 1 2 3 4 1 3** so the thumb stays off the raised 6th (a black key)."
+            : "The same fingering serves all three forms of the minor scale."
+        let cFlatNote = pc == 3 ? "\n\nThe sixth note is **C♭** — the white key you normally call B." : ""
 
         var steps: [Step] = []
         steps.append(L.info("\(name) natural minor", """
@@ -392,7 +432,7 @@ extension Curriculum {
             - Right hand: **\(TC.text(rhFingers))**
             - Left hand: **\(TC.text(lhFingers))**
 
-            The same fingering serves all three forms of the minor scale.
+            \(fingeringNote)\(cFlatNote)
             """, keys: L.keys(natural, labels: labels, hand: .right),
             example: L.timedTask("\(name) natural minor", "", TC.run(hi, .naturalMinor, hand: .right, duration: 0.5), bpm: 96,
                                  display: .staff, clef: .treble, key: key, flats: flats)))
@@ -403,8 +443,8 @@ extension Curriculum {
         steps.append(L.info("\(name) harmonic minor", """
             The **harmonic minor** raises the 7th note by a half step, here to **\(seventh)**. That creates a strong pull back to \(name) — and a wide, exotic-sounding gap of three half steps between the 6th and 7th notes.
 
-            Stretch gently across the gap; do not jab at the raised note.
-            """, keys: L.keys(harmonic, labels: TC.names(harmonic, flats: flats).enumerated().map { $0.offset == 6 ? seventh : $0.element }, hand: .right),
+            Stretch gently across the gap; do not jab at the raised note.\(TC.enharmonicNote([seventh]))
+            """, keys: L.keys(harmonic, labels: labels.enumerated().map { $0.offset == 6 ? seventh : $0.element }, hand: .right),
             example: L.timedTask("\(name) harmonic minor", "", TC.run(hi, .harmonicMinor, hand: .right, duration: 0.5), bpm: 96,
                                  display: .staff, clef: .treble, key: key, flats: flats)))
         steps.append(L.play("Harmonic minor, hands together", "Both hands, an octave apart, up and down.",
@@ -413,15 +453,15 @@ extension Curriculum {
         steps.append(L.info("\(name) melodic minor", """
             The **melodic minor** smooths out that gap. Going **up**, both the 6th and 7th are raised (**\(sixth)** and **\(seventh)**). Coming **down**, it returns to the natural minor.
 
-            So the scale is different in each direction — listen for the brighter climb and the darker descent.
-            """, keys: L.keys(melodic, labels: TC.names(melodic, flats: flats).enumerated().map { $0.offset == 5 ? sixth : $0.offset == 6 ? seventh : $0.element }, hand: .right),
+            So the scale is different in each direction — listen for the brighter climb and the darker descent.\(TC.enharmonicNote([sixth, seventh]))
+            """, keys: L.keys(melodic, labels: labels.enumerated().map { $0.offset == 5 ? sixth : $0.offset == 6 ? seventh : $0.element }, hand: .right),
             example: L.timedTask("\(name) melodic minor", "", TC.melodic(hi, hand: .right, duration: 0.5), bpm: 96,
                                  display: .staff, clef: .treble, key: key, flats: flats)))
-        steps.append(L.play("Melodic minor, right hand", "Raised 6th and 7th on the way up, natural minor on the way down.",
+        steps.append(L.play("Melodic minor, right hand", regrouped ? "Raised 6th and 7th on the way up with the regrouped fingering (2 3 1 2 3 4 1 3), natural minor on the way down." : "Raised 6th and 7th on the way up, natural minor on the way down.",
                             TC.melodic(hi, hand: .right), display: .staff, clef: .treble, key: key, flats: flats))
         steps.append(L.play("Melodic minor, left hand", "The same in the left hand.",
                             TC.melodic(lo, hand: .left), display: .staff, clef: .bass, key: key, flats: flats))
-        steps.append(L.timed("Harmonic minor in time", "Hands together with the metronome, one note per click, evenly.",
+        steps.append(L.timed("Harmonic minor in time", "Hands together with the metronome, one note per click, evenly. Use **Right hand** / **Left hand** (the app plays the other part) or **Wait for me** if you need a step in between.",
                              L.together(TC.run(hi, .harmonicMinor, hand: .right), TC.run(lo, .harmonicMinor, hand: .left)),
                              bpm: 66, display: .staff, key: key, flats: flats, rules: [.evenVelocity(maxStdDev: 12)]))
         return lesson("technique.minor.\(TC.slugs[pc])", "\(name) minor",
@@ -496,7 +536,7 @@ extension Curriculum {
             So far both hands played the same note an octave apart. Advanced scale practice changes the distance between the hands:
 
             - **An octave apart**: the standard form.
-            - **In thirds**: the right hand starts a third above the left (C with E).
+            - **In thirds**: the right hand starts a third above the left (C with E), so the hands play side by side.
             - **In sixths**: the right hand starts a sixth above the left (E with C).
             - **In tenths**: an octave plus a third — the thirds form, opened out.
 
@@ -673,7 +713,7 @@ extension Curriculum {
                                         L.melody("C3:w:5 C3:w:5", hand: .left)),
                              bpm: 80, display: .staff, flats: true))
         steps.append(L.timed("A blues lick", "A short phrase using the blue note. Lean a little on the first note of each bar.",
-                             L.melody("C5:e:5 B♭4:e:4 G4:e:3 F♯4:e:2 F4:e:1 E♭4:e:2 C4:q:1 r:q E♭4:e:2 F4:e:3 F♯4:e:4 G4:e:1 B♭4:e:2 C5:q.:3", hand: .right),
+                             L.melody("C5:e:5 B♭4:e:4 G4:e:3 F♯4:e:2 F4:e:1 E♭4:e:2 C4:q:1 r:e E♭4:e:2 F4:e:3 F♯4:e:4 G4:e:1 B♭4:e:2 C5:q:3", hand: .right),
                              bpm: 84, display: .staffAndRhythm, clef: .treble, flats: true))
         return lesson("technique.colour.blues", "Blues scale", "The minor pentatonic plus the blue note.", steps)
     }
@@ -702,8 +742,8 @@ extension Curriculum {
         steps.append(L.info("The other whole-tone scale", """
             Start on D♭ and you get the second scale: **D♭  E♭  F  G  A  B**. Two black keys, then four white.
             """, keys: L.keys(other, labels: ["D♭", "E♭", "F", "G", "A", "B", "D♭"], hand: .right)))
-        steps.append(L.play("The second scale, right hand", "2 3 on the black keys, then thumb on F and 2 3 4 up to B.",
-                            TC.custom(other, [2, 3, 1, 2, 3, 4, 2], hand: .right), display: .staff, clef: .treble, flats: true))
+        steps.append(L.play("The second scale, right hand", "2 3 on the black keys, then thumb on F, 2 3 4 up to B, and 5 on the top D♭.",
+                            TC.custom(other, [2, 3, 1, 2, 3, 4, 5], hand: .right), display: .staff, clef: .treble, flats: true))
         steps.append(L.timed("Whole-tone in time", "The C whole-tone scale in eighth notes, evenly.",
                              TC.custom(whole, rhFingers, hand: .right, duration: 0.5), bpm: 76, display: .staff, clef: .treble,
                              rules: [.evenVelocity(maxStdDev: 12)]))
@@ -1127,7 +1167,7 @@ extension Curriculum {
             example: L.timedTask("Hand over hand", "", tcHandOverHand(36, .major, duration: 0.5), bpm: 100, display: .staff)))
         steps.append(L.play("C major, going up", "Orange keys are the left hand, blue keys the right. Four octaves, ending with the left hand crossing over to the top C.",
                             tcHandOverHand(36, .major, descend: false), display: .staff))
-        steps.append(L.play("C major, up and down", "Now come back the same way. On the way down the right hand still plays its three notes; the left crosses back underneath.",
+        steps.append(L.play("C major, up and down", "Now come back the same way. On the way down each hand plays its three notes from the top, and the left hand crosses back over the right.",
                             tcHandOverHand(36, .major), display: .staff))
         steps.append(L.play("A minor", "The same sweep on A–C–E.", tcHandOverHand(33 + 12, .minor, descend: false), display: .staff))
         steps.append(L.play("F major", "And on F–A–C.", tcHandOverHand(41, .major, descend: false), display: .staff))

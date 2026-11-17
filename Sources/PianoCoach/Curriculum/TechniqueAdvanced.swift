@@ -122,7 +122,7 @@ extension Curriculum {
                     bpm: 66, display: .staffAndRhythm),
             L.timed("Even touch", "Right hand alone again. This time the score checks that no note sticks out.",
                     L.line(rhBroken, fingers: rhFingers, duration: 0.5), bpm: 80, display: .staffAndRhythm,
-                    rules: [.evenVelocity(maxStdDev: 13)]),
+                    rules: [.evenVelocity(maxStdDev: 10)]),
         ])
 
         let albertiChords: [[Int]] = [[48, 52, 55], [48, 53, 57], [47, 50, 55], [48, 52, 55]]
@@ -133,7 +133,7 @@ extension Curriculum {
         let alberti = lesson("technique.patterns.alberti", "Alberti bass",
                              "The classic low–high–middle–high left-hand pattern.", [
             L.info("Low – high – middle – high", """
-            The **Alberti bass** breaks a chord in the order **low, high, middle, high**. Mozart, Haydn and Clementi used it constantly under singing melodies.
+            The **Alberti bass** breaks a chord in the order **low, high, middle, high**. It is named after Domenico Alberti, who made it his trademark; Mozart, Haydn and Clementi then used it constantly under singing melodies.
 
             In the left hand on a C chord that is C–G–E–G with fingers **5–1–3–1**. The thumb plays every other note, so keep it light: let the hand rock gently rather than poking with the thumb.
             """, keys: L.keys("C3 E3 G3", hand: .left),
@@ -141,10 +141,10 @@ extension Curriculum {
                                         bpm: 96, display: .staff)),
             L.play("Learn the pattern", "C–G–E–G twice, fingers 5–1–3–1.",
                    L.line("C3 G3 E3 G3 C3 G3 E3 G3", hand: .left, fingers: "5 1 3 1 5 1 3 1")),
-            L.timed("Four chords", "One bar each of C, F, G and C. The bottom note changes least; feel how little the hand has to move.",
+            L.timed("Four chords", "One bar each of C, F, G and C. The chords are arranged so the hand hardly has to move: only one or two fingers shift at each change.",
                     albertiLine, bpm: 72, display: .staffAndRhythm),
             L.timed("Quiet and even", "The accompaniment should murmur. Keep every note at the same soft level.",
-                    albertiLine, bpm: 80, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 13)]),
+                    albertiLine, bpm: 80, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 10)]),
             L.timed("Melody over Alberti bass", "Right hand sings the melody in long notes; left hand keeps the pattern quieter than the tune.",
                     L.together(albertiMelody, albertiLine), bpm: 66, display: .staffAndRhythm,
                     rules: [.handBalance(melody: .right, minDiff: 10)]),
@@ -276,17 +276,17 @@ extension Curriculum {
                    L.line("D4 E4 D4 E4 D4 E4 D4 E4", fingers: "2 3 2 3 2 3 2 3")),
             L.timed("Measured trill: eighths", "Sixteen even eighth notes, then land on D.",
                     AdvKit.cycle(trillNotes16, fingers: [2, 3], durations: [0.5]) + L.line([62], fingers: [2], duration: 2, start: 8),
-                    bpm: 84, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 13)]),
+                    bpm: 84, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Measured trill: sixteenths", "Twice as fast. Stay loose; if it tightens, lower the tempo with the − button.",
                     AdvKit.cycle(trillNotes16, fingers: [2, 3], durations: [0.25]) + L.line([62], fingers: [2], duration: 2, start: 4),
-                    bpm: 60, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 14)]),
+                    bpm: 60, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Trill with 1–3", "The same trill with thumb and third finger, which many pianists find stronger.",
                     AdvKit.cycle(trillNotes16, fingers: [1, 3], durations: [0.25]) + L.line([62], fingers: [1], duration: 2, start: 4),
-                    bpm: 66, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 14)]),
+                    bpm: 66, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Left-hand trill", "C and D in the left hand with fingers 3 and 2.",
                     AdvKit.cycle(Array(repeating: [48, 50], count: 8).flatMap { $0 }, hand: .left, fingers: [3, 2], durations: [0.25])
                         + L.line([48], hand: .left, fingers: [3], duration: 2, start: 4),
-                    bpm: 56, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 15)]),
+                    bpm: 56, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
         ])
 
         let ornaments = lesson("technique.agility.ornaments", "Mordents, turns and grace notes",
@@ -294,23 +294,23 @@ extension Curriculum {
             L.info("Three small ornaments", """
             Ornaments decorate a main note with quick neighbours:
 
-            - **Mordent**: main note, the note below, main note again. (The *upper* mordent uses the note above.)
+            - **Mordent**: main note, the note below, main note again. The *upper* mordent (also called an inverted mordent) uses the note above instead.
             - **Turn**: note above, main note, note below, main note.
             - **Grace note**: one very short note squeezed in just before the main note.
 
             Play them lightly, with fingers close to the keys. The main note is the important one; the ornament should never disturb the beat.
             """),
-            L.timed("Upper mordents", "Each beat starts with a quick main–upper–main figure. Keep the beat exactly in place.",
-                    L.melody("E4:s:2 F4:s:3 E4:e:2 D4:s:2 E4:s:3 D4:e:2 C4:s:2 D4:s:3 C4:e:2 D4:q:3 C4:w:2"),
+            L.timed("Upper mordents", "Each of the first three beats starts with a quick main–upper–main figure. Keep the beat exactly in place. The hand stays in one five-finger position.",
+                    L.melody("E4:s:3 F4:s:4 E4:e:3 D4:s:2 E4:s:3 D4:e:2 C4:s:1 D4:s:2 C4:e:1 D4:q:2 C4:w:1"),
                     bpm: 56, display: .staffAndRhythm),
             L.timed("Lower mordents", "Now dip to the note below: main–lower–main.",
-                    L.melody("E4:s:3 D4:s:2 E4:e:3 F4:s:3 E4:s:2 F4:e:3 G4:s:3 F4:s:2 G4:e:3 F4:q:2 E4:w:1"),
+                    L.melody("E4:s:2 D4:s:1 E4:e:2 F4:s:3 E4:s:2 F4:e:3 G4:s:4 F4:s:3 G4:e:4 F4:q:3 E4:w:2"),
                     bpm: 56, display: .staffAndRhythm),
             L.timed("Turns", "A turn circles the main note: above, main, below, main.",
                     L.melody("G4:q:3 A4:s:4 G4:s:3 F4:s:2 G4:s:3 E4:q:2 F4:s:3 E4:s:2 D4:s:1 E4:s:2 C4:w:1"),
                     bpm: 56, display: .staffAndRhythm),
             L.timed("Grace notes", "A quick note right before beats 2 and 4, slipping into the main note. The main notes stay on the beat.",
-                    L.melody("r:e. D4:s:2 E4:q:3 r:e. F4:s:3 G4:q:4 r:e. D4:s:2 E4:q:3 r:q C4:q:1"),
+                    L.melody("r:e. D4:s:2 E4:q:3 r:e. F4:s:4 G4:q:5 r:e. D4:s:2 E4:q:3 r:q C4:q:1"),
                     bpm: 66, display: .staffAndRhythm),
         ])
 
@@ -329,10 +329,10 @@ extension Curriculum {
                    L.line(Array(repeating: 64, count: 8), fingers: [4, 3, 2, 1, 4, 3, 2, 1])),
             L.timed("Triplets with 3–2–1", "Four triplets on G, then land on C. One finger change per note.",
                     AdvKit.cycle(rep321, fingers: [3, 2, 1], durations: [1.0 / 3.0]) + L.line([72], fingers: [5], duration: 2, start: 4),
-                    bpm: 66, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 14)]),
-            L.timed("Sixteenths with 4–3–2–1", "Four groups of four on E, then land on C.",
-                    AdvKit.cycle(rep4321, fingers: [4, 3, 2, 1], durations: [0.25]) + L.line([60], fingers: [1], duration: 2, start: 4),
-                    bpm: 60, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 14)]),
+                    bpm: 66, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
+            L.timed("Sixteenths with 4–3–2–1", "Four groups of four on E, then land on the C above with finger 5.",
+                    AdvKit.cycle(rep4321, fingers: [4, 3, 2, 1], durations: [0.25]) + L.line([72], fingers: [5], duration: 2, start: 4),
+                    bpm: 60, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Left hand 3–2–1", "The left hand uses the same idea on C.",
                     AdvKit.cycle(Array(repeating: 48, count: 12), hand: .left, fingers: [3, 2, 1], durations: [1.0 / 3.0])
                         + L.line([43], hand: .left, fingers: [5], duration: 2, start: 4),
@@ -381,7 +381,7 @@ extension Curriculum {
             L.timed("Crossing in time", "The same arpeggio in quarter notes. Begin the crossing early so the top C is not late.",
                     AdvKit.seq(crossArp), bpm: 72, display: .rhythm),
             L.timed("Smoother and faster", "Now in eighth notes. The handover from one hand to the other should be inaudible.",
-                    AdvKit.seq(crossArp, duration: 0.5), bpm: 66, display: .rhythm, rules: [.evenVelocity(maxStdDev: 15)]),
+                    AdvKit.seq(crossArp, duration: 0.5), bpm: 66, display: .rhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.play("Bass and bell", "Right hand repeats a soft chord in the middle. Left hand alternates a bass note and a high note, crossing over each time.",
                    AdvKit.seq(crossMel)),
             L.timed("Bass and bell in time", "Keep the right hand still and low while the left hand flies over it.",
@@ -408,14 +408,14 @@ extension Curriculum {
                    L.line("C4 G4 C4 G4 C4 G4 C4 G4", fingers: "1 5 1 5 1 5 1 5")),
             L.timed("Rocking eighths", "Even eighth notes. Thumb notes and fifth-finger notes should be equally loud.",
                     AdvKit.cycle(rock, fingers: [1, 5], durations: [0.5]) + L.line([60], fingers: [1], duration: 2, start: 8),
-                    bpm: 84, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 13)]),
+                    bpm: 84, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Rocking sixths in sixteenths", "A wider rock, E to C, twice as fast.",
                     AdvKit.cycle(rockSixth, fingers: [1, 5], durations: [0.25]) + L.line([64], fingers: [1], duration: 2, start: 4),
-                    bpm: 58, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 14)]),
+                    bpm: 58, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Left-hand rotation", "C and G in the left hand, fingers 5 and 1.",
                     AdvKit.cycle(Array(repeating: [48, 55], count: 8).flatMap { $0 }, hand: .left, fingers: [5, 1], durations: [0.5])
                         + L.line([48], hand: .left, fingers: [5], duration: 2, start: 8),
-                    bpm: 80, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 13)]),
+                    bpm: 80, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Broken octaves", "The widest rock: an octave, in sixteenths. Pure rotation; the fingers hardly move.",
                     AdvKit.cycle(rockOct, fingers: [1, 5], durations: [0.25]) + L.line([60], fingers: [1], duration: 2, start: 4),
                     bpm: 54, display: .staffAndRhythm),
@@ -433,7 +433,7 @@ extension Curriculum {
             """, glyph: "trem.", keys: L.keys("C4 C5", hand: .right)),
             L.timed("Octave tremolo", "Right hand, C and C in measured sixteenths.",
                     AdvKit.cycle(rockOct, fingers: [1, 5], durations: [0.25]) + L.line([60], fingers: [1], duration: 2, start: 4),
-                    bpm: 63, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 14)]),
+                    bpm: 63, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Left-hand tremolo", "Octave tremolo in the bass: one bar on C, one bar on G.",
                     tremLH, bpm: 58, display: .staffAndRhythm),
             L.timed("Chord tremolo", "Split the chord: E and G together, then the top C, back and forth.",
@@ -524,11 +524,11 @@ extension Curriculum {
             Think of the melody hand as heavy and deep in the keys, the accompanying hand as light and close to the surface. It is harder than it sounds because the hands like to copy each other.
             """),
             L.play("Melody alone: forte", "Right hand only. Play the tune with a full, singing tone.",
-                   Array(tune.prefix(8)), display: .staff, rules: [L.f]),
+                   Array(tune.prefix(7)), display: .staff, rules: [L.f]),
             L.play("Chords alone: piano", "Left hand only. Four soft chords, barely pressed.",
                    L.chords(Array(repeating: [48, 52, 55], count: 4), hand: .left, fingers: Array(repeating: [5, 3, 1], count: 4)),
                    rules: [L.p]),
-            L.timed("Together", "Now combine them. The result shows the average loudness of each hand.",
+            L.timed("Together", "Now combine them. The result shows the average loudness of each hand. If the hands start copying each other, practise with **Right hand** or **Left hand** selected under the task (the app plays the other part), then return to **Both**.",
                     L.together(tune, softChords), bpm: 66, display: .staffAndRhythm,
                     rules: [.handBalance(melody: .right, minDiff: 15)]),
             L.timed("Melody in the left hand", "Swap roles: the left hand sings, the right hand taps soft chords off the beat.",
@@ -580,7 +580,7 @@ extension Curriculum {
             L.info("Why change the rhythm?", """
             To play a passage fast, practise it in **rhythmic variants**. In a long–short rhythm, half the notes are played quickly but each is followed by a rest point where the hand can relax and prepare. Then flip it to short–long so the *other* half gets the fast move.
 
-            After both variants, the even version feels easy. This lesson uses one short passage throughout.
+            After both variants, the even version feels easy. This lesson uses one short passage throughout. If a variant will not settle, slow it down with BPM − or switch on **Wait for me** to place the notes first.
             """, example: L.timedTask("The passage", "", AdvKit.runEvents(duration: 0.25), bpm: 96, display: .staff)),
             L.timed("Even eighths", "First learn the notes: steady eighth notes.",
                     L.line(run, fingers: fing, duration: 0.5) + landing, bpm: 84, display: .staffAndRhythm),
@@ -589,8 +589,8 @@ extension Curriculum {
             L.timed("Short – long", "Reverse it: quick first note, long second note.",
                     AdvKit.cycle(run, fingers: fing, durations: [0.25, 0.75]) + landing, bpm: 72, display: .staffAndRhythm),
             L.timed("Even sixteenths", "Now straight sixteenths. It should feel easier than before.",
-                    AdvKit.runEvents(duration: 0.25), bpm: 63, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 14)]),
-            L.timed("Push the tempo", "Same passage, faster and with stricter timing. Use the BPM + button to find your clean top speed; the app remembers your best.",
+                    AdvKit.runEvents(duration: 0.25), bpm: 63, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
+            L.timed("Push the tempo", "Same passage, faster and with stricter timing. Use BPM + to find your clean top speed; the app remembers your best. Or switch on **Loop bars** with auto speed-up: the passage repeats and the tempo rises a little each time you play it cleanly.",
                     AdvKit.runEvents(duration: 0.25), bpm: 80, display: .staffAndRhythm, toleranceMs: 80),
         ])
 
@@ -618,6 +618,8 @@ extension Curriculum {
             **Chunking** means playing a few notes at the final tempo, landing on the first note of the next group, and stopping. In the stop you relax completely and think ahead.
 
             Because each chunk is short, you can play it fast and loose from the start. Then make the chunks longer: 4 notes, 8 notes, the whole passage. Always land on the next beat so the chunks overlap.
+
+            In your own pieces, **Loop bars** under any timed task is chunking built in: pick the bar that trips you and repeat only that.
             """),
             L.timed("Chunks of four", "Four quick notes landing on the fifth, then a full beat of rest. Relax your hand in every rest.",
                     chunks(4), bpm: 72, display: .staffAndRhythm),
@@ -625,7 +627,7 @@ extension Curriculum {
                     chunks(8), bpm: 72, display: .staffAndRhythm),
             L.timed("The whole passage", "Join the chunks without stopping.",
                     AdvKit.runEvents(duration: 0.25), bpm: 72, display: .staffAndRhythm),
-            L.timed("Step the tempo up", "Start here, and each time you pass press BPM + once (4 BPM) and go again. Stop raising it when the playing stops being clean.",
+            L.timed("Step the tempo up", "Start here, and each time you pass press BPM + once (4 BPM) and go again. **Loop bars** with auto speed-up does the same thing for you, and can repeat just one bar if that is where the trouble is. Stop raising the tempo when the playing stops being clean.",
                     AdvKit.runEvents(duration: 0.25), bpm: 80, display: .staffAndRhythm, pass: 0.9, toleranceMs: 80),
         ])
 
@@ -646,14 +648,14 @@ extension Curriculum {
                 "Fingers that are not playing are resting, not held up in the air",
             ]),
             L.timed("Eight bars, right hand", "A five-finger pattern for eight bars without stopping. Keep the sound even all the way to the end.",
-                    L.loop(five, times: 8, length: 4), bpm: 88, display: .rhythm, rules: [.evenVelocity(maxStdDev: 15)]),
+                    L.loop(five, times: 8, length: 4), bpm: 88, display: .rhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Eight bars, left hand", "The same in the left hand.",
-                    L.loop(fiveLH, times: 8, length: 4), bpm: 84, display: .rhythm, rules: [.evenVelocity(maxStdDev: 15)]),
+                    L.loop(fiveLH, times: 8, length: 4), bpm: 84, display: .rhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Eight bars, hands together", "Both hands in parallel. Do a relaxation check every two bars.",
                     L.loop(L.together(five, fiveLH), times: 8, length: 4), bpm: 76, display: .rhythm),
             L.timed("Long Alberti bass", "Eight bars of Alberti bass. If the thumb side tires, you are pressing instead of rocking.",
                     L.line(albertiLong, hand: .left, fingers: Array(repeating: [5, 1, 3, 1], count: 16).flatMap { $0 }, duration: 0.5),
-                    bpm: 92, display: .rhythm, rules: [.evenVelocity(maxStdDev: 15)]),
+                    bpm: 92, display: .rhythm, rules: [.evenVelocity(maxStdDev: 12)]),
         ])
 
         let health = lesson("technique.practice.health", "Injury prevention",
@@ -706,7 +708,7 @@ extension Curriculum {
         let hanon = lesson("technique.traditions.hanon", "In the style of Hanon",
                            "Sequential five-finger patterns for evenness and endurance.", [
             L.info("Hanon: The Virtuoso Pianist", """
-            Charles-Louis Hanon's exercises (1873) repeat one short finger pattern, moving it up a step each bar. They train **evenness, finger independence and stamina**, with both hands doing the same work.
+            Charles-Louis Hanon's *The Virtuoso Pianist* (1873) is a set of 60 exercises. The early ones repeat one short finger pattern, moving it up a step each bar. They train **evenness, finger independence and stamina**, with both hands doing the same work.
 
             The first exercise skips a third, climbs by step, and walks back: C–E–F–G–A–G–F–E, then the same from D, from E, and so on. Play it with firm fingertips and a quiet hand. Keep it relaxed: Hanon played with tension does more harm than good.
             """, example: L.timedTask("Hanon pattern", "", AdvKit.hanon(start: 60, bars: 2, hand: .right, duration: 0.25), bpm: 80, display: .staff)),
@@ -724,7 +726,7 @@ extension Curriculum {
                     bpm: 72, display: .staffAndRhythm),
             L.timed("In sixteenths, evenly", "Right hand at speed. The score checks that every note has the same weight.",
                     AdvKit.hanon(start: 60, bars: 4, hand: .right, duration: 0.25), bpm: 60, display: .staffAndRhythm,
-                    rules: [.evenVelocity(maxStdDev: 12)]),
+                    rules: [.evenVelocity(maxStdDev: 10)]),
         ])
 
         let czScale: [Int] = AdvKit.n("C4 D4 E4 F4 G4 A4 B4 C5 B4 A4 G4 F4 E4 D4 C4 D4")
@@ -737,7 +739,7 @@ extension Curriculum {
         let czerny = lesson("technique.traditions.czerny", "In the style of Czerny",
                             "Velocity figures: scale runs and broken chords over simple harmony.", [
             L.info("Czerny: The School of Velocity", """
-            Carl Czerny, Beethoven's pupil and Liszt's teacher, wrote thousands of short studies. Unlike Hanon they sound like little pieces: quick **scale runs and broken-chord figures** in the right hand over plain left-hand chords.
+            Carl Czerny, Beethoven's pupil and Liszt's teacher, wrote well over a thousand studies and exercises, among them *The School of Velocity*, Op. 299. Unlike Hanon they sound like little pieces: quick **scale runs and broken-chord figures** in the right hand over plain left-hand chords.
 
             They train **speed with clarity**: light fingers, clean thumb crossings, and a left hand that stays out of the way. This short study is written in that style.
             """, example: L.timedTask("Velocity study", "", L.together(czAll, czLH), bpm: 76, display: .staff)),
@@ -749,14 +751,26 @@ extension Curriculum {
                     L.line(czScale + czArp, fingers: czScaleF + czArpF, duration: 0.5) + L.line([60], fingers: [1], duration: 2, start: 16),
                     bpm: 92, display: .staffAndRhythm),
             L.timed("Right hand in sixteenths", "Now at Czerny speed. Light fingers, no accents on the thumb.",
-                    czAll, bpm: 54, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 14)]),
+                    czAll, bpm: 54, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Hands together", "Add the left-hand chords. They are soft punctuation under the running right hand.",
                     L.together(czAll, czLH), bpm: 54, display: .staffAndRhythm,
                     rules: [.handBalance(melody: .right, minDiff: 5)]),
         ])
 
-        let burgRH = L.melody("E4:q:1 G4:q:2 C5:h:5 B4:q:4 A4:q:3 G4:h:2 A4:q:3 F4:q:1 D4:q:1 G4:q:4 E4:w:2")
+        let burgRHPlain = L.melody("E4:q:1 G4:q:2 C5:h:5 B4:q:4 A4:q:3 G4:h:2 A4:q:5 F4:q:3 D4:q:1 G4:q:4 E4:w:2")
+        // Two phrases, each under one slur.
+        var burgRH = burgRHPlain
+        burgRH[0].slurStart = true
+        burgRH[5].slurEnd = true
+        burgRH[6].slurStart = true
+        burgRH[10].slurEnd = true
         let burgLH = L.melody("C3+G3:h:5-1 C3+G3:h:5-1 G2+D3:h:5-1 G2+D3:h:5-1 F2+C3:h:5-1 G2+D3:h:5-1 C3+G3:w:5-1", hand: .left)
+        var burgStudy = L.timedTask("The whole study", "Hands together. Let the melody sing over a quiet left hand, growing towards the high C and relaxing away from it. If it is hard to balance, practise with **Right hand** or **Left hand** selected under the task first.",
+                                    L.together(burgRH, burgLH), bpm: 72, display: .staffAndRhythm,
+                                    rules: [.handBalance(melody: .right, minDiff: 10)])
+        burgStudy.markers = [StaffMarker(beat: 0, text: "mp", below: true), StaffMarker(beat: 1, text: "cresc.", below: true),
+                             StaffMarker(beat: 4, text: "mf", below: true), StaffMarker(beat: 6, text: "dim.", below: true),
+                             StaffMarker(beat: 12, text: "p", below: true)]
         let burgmuller = lesson("technique.traditions.burgmuller", "In the style of Burgmüller",
                                 "A short lyrical study: phrasing, dynamics and balance.", [
             L.info("Burgmüller: 25 Easy and Progressive Studies", """
@@ -764,19 +778,17 @@ extension Curriculum {
 
             This short piece in that spirit is about **shaping a phrase**: grow toward the high point, then relax away from it, with the left hand always softer than the tune.
             """, example: L.timedTask("Lyrical study", "", L.together(burgRH, burgLH), bpm: 84, display: .staff)),
-            L.play("Rise: crescendo", "Climb with a crescendo: each note a little louder than the last.",
-                   L.line("C4 E4 G4 C5 E5", fingers: "1 2 3 5 5"), display: .staff, rules: [.crescendo]),
+            L.play("Rise: crescendo", "Climb with a crescendo: each note a little louder than the last. The thumb passes under to the high C.",
+                   L.line("C4 E4 G4 C5 E5", fingers: "1 2 3 1 3"), display: .staff, rules: [.crescendo]),
             L.play("Fall: diminuendo", "Come down getting softer on every note.",
-                   L.line("E5 C5 G4 E4 C4", fingers: "5 3 2 1 1"), display: .staff, rules: [.diminuendo]),
-            L.play("The melody, legato", "The right-hand tune, smoothly connected. Fingers shown above the notes.",
+                   L.line("E5 C5 G4 E4 C4", fingers: "3 1 3 2 1"), display: .staff, rules: [.diminuendo]),
+            L.play("The melody, legato", "The right-hand tune, smoothly connected. Finger numbers are shown above the notes; in bar 3 the hand shifts down so that finger 5 takes the A.",
                    burgRH, display: .staff, rules: [.legato]),
             L.timed("Melody in time", "Right hand with the metronome, still legato.",
                     burgRH, bpm: 76, display: .staffAndRhythm, rules: [.legato]),
             L.play("Left hand", "Soft open fifths in the left hand.",
                    burgLH, display: .staff, rules: [L.p]),
-            L.timed("The whole study", "Hands together. Let the melody sing over a quiet left hand.",
-                    L.together(burgRH, burgLH), bpm: 72, display: .staffAndRhythm,
-                    rules: [.handBalance(melody: .right, minDiff: 10)]),
+            .play(burgStudy),
         ])
 
         let pischnaInner = String(repeating: "R:D4:2 R:E4:3 R:F4:4 R:E4:3 ", count: 3)
@@ -784,7 +796,7 @@ extension Curriculum {
         let pischna = lesson("technique.traditions.pischna", "In the style of Pischna",
                              "Held notes: some fingers stay down while others move.", [
             L.info("Pischna: held-note exercises", """
-            Josef Pischna's exercises begin with **held notes**: one or two fingers keep their keys down while the others play. This trains **finger independence**, especially the weaker 3rd, 4th and 5th fingers.
+            Josef Pischna's *60 Progressive Exercises* begin with **held notes**: one or two fingers keep their keys down while the others play. This trains **finger independence**, especially the weaker 3rd, 4th and 5th fingers.
 
             Hold the keys down with almost no pressure; just enough weight to keep them from rising. The moving fingers lift only a little. If the back of your hand starts to feel tight, stop and shake out.
 
@@ -798,10 +810,10 @@ extension Curriculum {
                    AdvKit.seq("L:C3+G3:5-1 " + pischnaLH)),
             L.timed("Held frame, moving middle", "Play the frame on beat 1 and hold it, then the inner fingers in even eighth notes.",
                     AdvKit.seq("R:C4+G4:1-5", duration: 1) + AdvKit.seq(pischnaInner, duration: 0.5, start: 1),
-                    bpm: 66, display: .rhythm, rules: [.evenVelocity(maxStdDev: 16)]),
+                    bpm: 66, display: .rhythm, rules: [.evenVelocity(maxStdDev: 12)]),
             L.timed("Left hand in time", "The same for the left hand.",
                     AdvKit.seq("L:C3+G3:5-1", duration: 1) + AdvKit.seq(pischnaLH, duration: 0.5, start: 1),
-                    bpm: 63, display: .rhythm, rules: [.evenVelocity(maxStdDev: 16)]),
+                    bpm: 63, display: .rhythm, rules: [.evenVelocity(maxStdDev: 12)]),
         ])
 
         let dohRH = "R:C4+D4+E4+F4+G4:1-2-3-4-5 " + String(repeating: "R:E4:3 ", count: 4) + String(repeating: "R:F4:4 ", count: 4)
@@ -811,9 +823,9 @@ extension Curriculum {
         let dohnanyi = lesson("technique.traditions.dohnanyi", "In the style of Dohnányi",
                               "Hold four fingers down and train one at a time.", [
             L.info("Dohnányi: Essential Finger Exercises", """
-            Ernő Dohnányi's exercises go a step beyond held notes: **all five fingers** rest on their keys, four hold down, and one finger at a time lifts and plays. They build **strength and independence** in each finger very efficiently.
+            Ernő Dohnányi's *Essential Finger Exercises* (1929) go a step beyond held notes: **all five fingers** rest on their keys, four hold down, and one finger at a time lifts and plays. They build **strength and independence** in each finger very efficiently.
 
-            They are also demanding, so follow Dohnányi's own advice: a few minutes only, slowly, with a relaxed hand. The fourth finger will not lift far; that is normal anatomy. Do not force it.
+            They are also demanding, so use them sparingly: a few minutes only, slowly, with a relaxed hand. The fourth finger will not lift far; that is normal anatomy. Do not force it.
             """, keys: L.keys("C4 D4 E4 F4 G4", hand: .right), links: [.video("Dohnanyi essential finger exercises tutorial")]),
             L.checklist("Safety first", "Rest all five fingers on C–D–E–F–G and press them down gently.", items: [
                 "The held fingers rest on the key bed without pressing hard",
@@ -895,7 +907,7 @@ extension Curriculum {
                     scale, bpm: 84, display: .staffAndRhythm, rules: [.evenVelocity(maxStdDev: 8)]),
             L.timed("Trill", "A measured sixteenth-note trill with fingers 2 and 3.",
                     AdvKit.cycle(trill, fingers: [2, 3], durations: [0.25]), bpm: 66, display: .staffAndRhythm,
-                    rules: [.evenVelocity(maxStdDev: 9)]),
+                    rules: [.evenVelocity(maxStdDev: 8)]),
         ])
 
         var ladder: [Step] = [

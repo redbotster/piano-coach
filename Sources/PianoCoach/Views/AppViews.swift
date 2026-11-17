@@ -34,6 +34,7 @@ struct ContentView: View {
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 MIDIStatusView()
+                ProfileMenu()
                 Toggle(isOn: $app.soundOn) {
                     Label("Piano sound", systemImage: app.soundOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
                 }
@@ -43,6 +44,57 @@ struct ContentView: View {
                 }
                 .help("Note names printed on the on-screen keys")
             }
+        }
+    }
+}
+
+/// Switch between the people who use this Mac to practise.
+struct ProfileMenu: View {
+    @EnvironmentObject var app: AppModel
+    @State private var adding = false
+    @State private var renaming = false
+    @State private var deleting = false
+    @State private var name = ""
+
+    var body: some View {
+        Menu {
+            ForEach(app.profiles.profiles) { profile in
+                Button {
+                    app.switchProfile(profile.id)
+                } label: {
+                    if profile.id == app.profiles.currentID {
+                        Label(profile.name, systemImage: "checkmark")
+                    } else {
+                        Text(profile.name)
+                    }
+                }
+            }
+            Divider()
+            Button("Add Profile…") { name = ""; adding = true }
+            Button("Rename “\(app.profiles.current.name)”…") { name = app.profiles.current.name; renaming = true }
+            Button("Delete “\(app.profiles.current.name)”…", role: .destructive) { deleting = true }
+                .disabled(app.profiles.profiles.count < 2)
+        } label: {
+            Label(app.profiles.current.name, systemImage: "person.crop.circle")
+                .labelStyle(.titleAndIcon)
+        }
+        .help("Each profile has its own progress, history and practice plan")
+        .alert("New profile", isPresented: $adding) {
+            TextField("Name", text: $name)
+            Button("Add") { app.addProfile(name: name) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Each person gets their own progress, stars and daily plan. Imported songs are shared.")
+        }
+        .alert("Rename profile", isPresented: $renaming) {
+            TextField("Name", text: $name)
+            Button("Rename") { app.renameProfile(to: name) }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Delete “\(app.profiles.current.name)” and all of its progress?", isPresented: $deleting) {
+            Button("Delete profile", role: .destructive) { app.deleteCurrentProfile() }
+        } message: {
+            Text("This cannot be undone.")
         }
     }
 }
@@ -186,6 +238,12 @@ struct KeyboardPanel: View {
             .padding(.horizontal, 14)
             .frame(height: 22)
 
+            if app.fallingNotes, !app.lessonFinished, let runner = app.runner, runner.task.isTimed, runner.task.showTargets,
+               runner.phase != .done, !runner.task.events.allSatisfy({ $0.isAnyKey }) {
+                FallingNotesView(task: runner.task, statuses: runner.statuses, clock: runner.clock, bpm: runner.bpm)
+                    .frame(height: 130)
+                    .padding(.horizontal, 10)
+            }
             KeyboardView(marks: app.keyMarks, pressed: app.pressed, labelMode: app.labelMode,
                          onPress: { app.handle(.noteOn(note: $0, velocity: 80, time: HostClock.now())) },
                          onRelease: { app.handle(.noteOff(note: $0, time: HostClock.now())) })
@@ -311,10 +369,36 @@ struct SettingsView: View {
                 Text("The Launchkey makes no sound of its own. Turn this off if you are also running a DAW or synth.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("Piano sound") {
+                HStack {
+                    Text(app.soundFontPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Built-in piano")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Choose SoundFont…") { app.chooseSoundFont() }
+                    if app.soundFontPath != nil { Button("Use built-in") { app.resetSoundFont() } }
+                }
+                Text("For a richer piano, load any SoundFont (.sf2) whose first instrument is a piano.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Timing") {
                 HStack {
+                    if let calibration = app.calibration {
+                        Text(calibration.phase == .countIn ? "Get ready… \(calibration.countInBeat ?? 0)" : "Tap any key on every click")
+                            .fontWeight(.semibold)
+                        Spacer()
+                        Button("Cancel") { app.cancelCalibration() }
+                    } else {
+                        Text("Calibrate by tapping along with eight clicks.")
+                        Spacer()
+                        Button("Calibrate…") { app.startCalibration() }
+                    }
+                }
+                if let message = app.calibrationMessage {
+                    Text(message).font(.caption).foregroundStyle(.secondary)
+                }
+                HStack {
                     Text("Latency compensation")
-                    Slider(value: $app.latencyMs, in: 0...80, step: 5)
+                    Slider(value: $app.latencyMs, in: 0...150, step: 5)
                     Text("\(Int(app.latencyMs)) ms").monospacedDigit().frame(width: 50)
                 }
                 Text("If timing results always say you are late even when you feel on the beat (common with Bluetooth headphones), raise this.")
@@ -328,14 +412,14 @@ struct SettingsView: View {
                      : "Available when a Launchkey is connected. The keys themselves have no lights, so the on-screen keyboard shows what to play.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Progress") {
-                Button("Reset all progress…", role: .destructive) { confirmReset = true }
+            Section("Progress for \(app.profiles.current.name)") {
+                Button("Reset all progress and history…", role: .destructive) { confirmReset = true }
                     .confirmationDialog("Erase all lesson progress and stars?", isPresented: $confirmReset) {
-                        Button("Erase progress", role: .destructive) { app.progress.reset() }
+                        Button("Erase progress", role: .destructive) { app.resetAllProgress() }
                     }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 430)
+        .frame(width: 540, height: 600)
     }
 }

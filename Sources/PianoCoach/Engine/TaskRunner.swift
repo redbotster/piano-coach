@@ -79,19 +79,24 @@ final class TaskRunner: ObservableObject {
     private var eventHadError: [Bool]
     private var wrongNotes = 0
     private var pedalEvents: [(down: Bool, time: Double)] = []
-    private var startTime: Double = 0
-    private var tempo = TempoMap(bpm0: 80, bpm1: 80, total: 0)
+    private(set) var startTime: Double = 0
+    private(set) var tempo = TempoMap(bpm0: 80, bpm1: 80, total: 0)
+
+    /// Wait mode turns a timed task into one that pauses on every note until it is played.
+    let waitMode: Bool
+    var timedRun: Bool { task.isTimed && !waitMode }
     private var window: Double = 0.25
     private var timer: Timer?
     private var finishWork: DispatchWorkItem?
 
-    init(task: PlayTask, bpm: Double? = nil) {
+    init(task: PlayTask, bpm: Double? = nil, waitMode: Bool = false) {
         self.task = task
+        self.waitMode = waitMode
         self.statuses = Array(repeating: .pending, count: task.events.count)
         self.matched = task.events.map { Array(repeating: false, count: max(1, $0.notes.count)) }
         self.eventHadError = Array(repeating: false, count: task.events.count)
         self.bpm = bpm ?? task.timedConfig?.bpm ?? 80
-        self.phase = task.isTimed ? .ready : .running
+        self.phase = (task.isTimed && !waitMode) ? .ready : .running
     }
 
     deinit { timer?.invalidate() }
@@ -113,7 +118,7 @@ final class TaskRunner: ObservableObject {
         result = nil
         clock.beat = 0
         countInBeat = nil
-        phase = task.isTimed ? .ready : .running
+        phase = timedRun ? .ready : .running
     }
 
     func stop() {
@@ -125,7 +130,7 @@ final class TaskRunner: ObservableObject {
 
     /// Begin a timed attempt: count-in, then the task.
     func start() {
-        guard let config = task.timedConfig else { return }
+        guard timedRun, let config = task.timedConfig else { return }
         reset()
         let total = task.totalBeats
         let endBpm = config.tempoEnd.map { $0 * bpm / config.bpm } ?? bpm
@@ -206,7 +211,7 @@ final class TaskRunner: ObservableObject {
         case .countIn, .running:
             break
         }
-        if task.isTimed {
+        if timedRun {
             timedNoteOn(note, velocity: velocity, time: time - latencyMs / 1000)
         } else {
             untimedNoteOn(note, velocity: velocity, time: time)
@@ -249,6 +254,7 @@ final class TaskRunner: ObservableObject {
             if !matched[index].contains(false) {
                 statuses[index] = eventHadError[index] ? .wrong : .correct
                 index += 1
+                clock.beat = index < task.events.count ? task.events[index].beat : task.totalBeats
                 if index >= task.events.count {
                     let work = DispatchWorkItem { [weak self] in self?.finish() }
                     finishWork = work
@@ -328,7 +334,7 @@ final class TaskRunner: ObservableObject {
         var meanDev: Double?
         var spread: Double?
 
-        if task.isTimed {
+        if timedRun {
             total = task.events.reduce(0) { $0 + max(1, $1.notes.count) }
             correct = matched.reduce(0) { $0 + $1.filter { $0 }.count }
             let devs = good.compactMap { $0.deviationMs }
@@ -345,7 +351,7 @@ final class TaskRunner: ObservableObject {
         let rules = task.rules.map { evaluate($0, good: good) }
 
         var passed = accuracy >= task.passAccuracy && !rules.contains { !$0.passed }
-        if task.isTimed {
+        if timedRun {
             if wrongNotes > max(2, total / 4) { passed = false }
             if let m = meanAbs, m > task.timingToleranceMs { passed = false }
             if meanAbs == nil { passed = false }
@@ -354,7 +360,7 @@ final class TaskRunner: ObservableObject {
         if passed {
             stars = 1
             if accuracy >= 0.95 && wrongNotes <= max(0, total / 20) { stars += 1 }
-            if task.isTimed {
+            if timedRun {
                 if let m = meanAbs, m <= 40, accuracy >= 0.95 { stars += 1 }
             } else if wrongNotes == 0 {
                 stars += 1
@@ -364,7 +370,7 @@ final class TaskRunner: ObservableObject {
                           meanAbsDeviationMs: meanAbs, meanDeviationMs: meanDev, timingSpreadMs: spread,
                           velocityMean: velocities.isEmpty ? nil : mean(velocities),
                           velocityStdDev: velocities.count > 1 ? stdDev(velocities) : nil,
-                          bpm: task.isTimed ? bpm : nil, rules: rules, passed: passed, stars: stars)
+                          bpm: timedRun ? bpm : nil, rules: rules, passed: passed, stars: stars)
     }
 
     private func evaluate(_ rule: Rule, good: [Hit]) -> RuleResult {
@@ -439,7 +445,7 @@ final class TaskRunner: ObservableObject {
             for hit in good {
                 let held = (hit.off ?? hit.on) - hit.on
                 let expected = hit.event.map { task.events[$0].duration } ?? 1
-                let limit = task.isTimed ? min(0.25, max(0.09, expected * secondsPerBeat * 0.55)) : 0.25
+                let limit = timedRun ? min(0.25, max(0.09, expected * secondsPerBeat * 0.55)) : 0.25
                 if held <= limit { short += 1 }
             }
             let share = good.isEmpty ? 0 : Double(short) / Double(good.count)

@@ -16,6 +16,10 @@ enum Snapshot {
                     case .quiz(let quiz): if let r = app.runner { TaskView(runner: r, task: r.task, quiz: quiz) }
                     }
                 }
+                if let runner = app.runner, runner.task.isTimed, runner.task.showTargets {
+                    FallingNotesView(task: runner.task, statuses: runner.statuses, clock: runner.clock, bpm: runner.bpm)
+                        .frame(height: 130)
+                }
                 KeyboardView(marks: app.keyMarks, pressed: app.pressed, labelMode: .cOnly).frame(height: 170)
             }
             .padding(20)

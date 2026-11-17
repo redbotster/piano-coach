@@ -106,6 +106,7 @@ extension Curriculum {
             - Tap **any key** on each block as the playhead reaches it. For rhythm-only drills the pitch doesn't matter.
             - Coloured ticks show where you really played: green is on the beat, yellow is close, orange is far.
             - Your result shows the average distance from the beat in milliseconds and whether you tend to **rush** (early) or **drag** (late).
+            - Too fast? Lower the tempo with the **BPM − / +** control, or use **Loop bars** to repeat a tricky spot.
 
             Tip: don't wait to hear the click and then react. Predict it — aim to land *with* the click so it almost disappears under your note.
             """),
@@ -560,7 +561,7 @@ extension Curriculum {
                     L.loop(L.rhythm("q q q", note: 67, hand: .right), times: 4, length: 3), bpm: 88, meter: (3, 4), display: .rhythm),
             L.timed("Left hand: two", "Left hand alone on C: two even notes per bar — on beat 1 and on the “&” of 2.",
                     L.loop(L.rhythm("q. q.", note: 48, hand: .left, count: false), times: 4, length: 3), bpm: 88, meter: (3, 4), display: .rhythm),
-            L.timed("Together, slowly", "“Nice cup of tea”: together – right – left – right. Top lane is the right hand, bottom lane the left.",
+            L.timed("Together, slowly", "“Nice cup of tea”: together – right – left – right. Top lane is the right hand, bottom lane the left. If the hands tangle, choose **Right hand** or **Left hand** below to practise one part on its own.",
                     R.poly(right: "q q q", left: "q. q.", bar: 3, times: 4), bpm: 66, meter: (3, 4), display: .rhythm, pass: 0.75),
             L.timed("2 against 3 at tempo", "Let each hand flow evenly rather than thinking of the composite.",
                     R.poly(right: "q q q", left: "q. q.", bar: 3, times: 6), bpm: 92, meter: (3, 4), display: .rhythm, pass: 0.75),
@@ -615,7 +616,7 @@ extension Curriculum {
 
             These describe **character** as much as speed. A metronome mark such as ♩ = 120 gives an exact figure: 120 quarter notes per minute.
 
-            You will play the same melody at five different tempos.
+            You will play the same melody at six different tempos.
             """, glyph: "♩ = 120"),
             R.tune("Largo", "♩ = 50. Very slow: the hard part is not rushing. Feel the space between clicks.", melody, bpm: 50),
             R.tune("Adagio", "♩ = 69. Slow and calm.", melody, bpm: 69),
@@ -651,11 +652,20 @@ extension Curriculum {
 
             Fermatas often follow a ritardando at the end of a phrase. Listen to the example: the pulse slows, the high note is held, then the phrase finishes.
             """, glyph: "𝄐", example: L.task("Fermata", "", R.free("C4 E4 G4 C5 G4 E4 C4", [1, 1, 1.15, 4, 1, 1, 3]))),
-            L.play("Hold the fermata", """
-            This step is untimed, so you control the pulse. Play C–E–G steadily, **hold the high C** for a long, calm fermata, then finish the phrase in tempo. Connect the notes smoothly.
-            """, L.line("C4 E4 G4 C5 G4 E4 C4", fingers: "1 2 3 5 3 2 1"), display: .staff, rules: [.legato]),
-            R.tune("Slow into the final hold", "A ritardando into a long last note. Hold the final C until the bar ends.",
-                   "E4:q G4:q C5:q G4:q | E4:q D4:q C4:h~h r:h", bpm: 100, tol: 130, total: 12, tempoEnd: 56),
+            .play({
+                var events = L.line("C4 E4 G4 C5 G4 E4 C4", fingers: "1 2 3 5 3 2 1")
+                events[3].fermata = true
+                return L.task("Hold the fermata", """
+                This step is untimed, so you control the pulse. Play C–E–G steadily, **hold the high C** for a long, calm fermata, then finish the phrase in tempo. Connect the notes smoothly.
+                """, events, display: .staff, rules: [.legato])
+            }()),
+            .play({
+                var task = R.tuneTask("Slow into the final hold", "A ritardando into a long last note. Hold the final C until the bar ends.",
+                                      "E4:q G4:q C5:q G4:q | E4:q D4:q C4:h~h r:h", bpm: 100, tol: 130, total: 12, tempoEnd: 56)
+                task.markers = [StaffMarker(beat: 0, text: "rit.")]
+                if !task.events.isEmpty { task.events[task.events.count - 1].fermata = true }
+                return task
+            }()),
         ])
 
         let rubato = lesson("rhythm.tempo.rubato", "Rubato and expressive timing", "Bending time for expression.", [
@@ -799,7 +809,7 @@ extension Curriculum {
 
         let patterns = lesson("rhythm.lab.patterns", "Rhythm pattern challenges", "Mixed patterns scored for accuracy.", [
             L.info("Putting it together", """
-            Each challenge mixes several things you have learned. To pass you need **90% of the notes** in the right place, with few extra notes.
+            Each challenge mixes several things you have learned. To pass you need about **90% of the notes** in the right place, with few extra notes.
 
             Before pressing Start: scan the pattern, find the hardest beat, and count it through once in your head. Use the **Demo** button to hear it, and lower the tempo if you need to — then work back up.
             """),

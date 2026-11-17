@@ -24,16 +24,30 @@ final class AudioEngine {
         do {
             try engine.start()
             isRunning = true
-            let bank = URL(fileURLWithPath: "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls")
-            try? piano.loadSoundBankInstrument(at: bank, program: 0,
-                                               bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
-                                               bankLSB: UInt8(kAUSampler_DefaultBankLSB))
+            loadInstrument(from: nil)
             clicker.play()
         } catch {
             NSLog("Audio engine failed to start: \(error)")
         }
         piano.volume = pianoVolume
         clicker.volume = clickVolume
+    }
+
+    static let builtInBank = URL(fileURLWithPath: "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls")
+
+    /// Load the piano from a SoundFont (.sf2) or DLS file; nil restores the built-in sound.
+    @discardableResult
+    func loadInstrument(from url: URL?) -> Bool {
+        guard isRunning else { return false }
+        do {
+            try piano.loadSoundBankInstrument(at: url ?? Self.builtInBank, program: 0,
+                                              bankMSB: UInt8(kAUSampler_DefaultMelodicBankMSB),
+                                              bankLSB: UInt8(kAUSampler_DefaultBankLSB))
+            return true
+        } catch {
+            if url != nil { loadInstrument(from: nil) }
+            return false
+        }
     }
 
     private func makeClick(frequency: Double, length: Double) -> AVAudioPCMBuffer {

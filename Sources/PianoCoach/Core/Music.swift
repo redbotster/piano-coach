@@ -302,8 +302,9 @@ enum Fingering {
     /// Fingering for a full run of `count` notes (multi-octave, optionally there-and-back).
     static func scaleRun(tonicPC: Int, type: ScaleType, hand: Hand, octaves: Int, descend: Bool) -> [Int]? {
         guard let one = scale(tonicPC: tonicPC, type: type, hand: hand) else { return nil }
-        // Inner octaves start on the finger that ends the shape (5 becomes a thumb crossing).
-        let inner = (hand != .left && one[7] == 5) ? 1 : one[7]
+        // Inner octaves start on the finger that ends the shape; right-hand shapes that begin on the
+        // thumb (C and F types) cross to the thumb again instead.
+        let inner = (hand != .left && one[0] == 1) ? 1 : one[7]
         var up: [Int] = []
         for o in 0..<octaves {
             var chunk = Array(one.dropLast())

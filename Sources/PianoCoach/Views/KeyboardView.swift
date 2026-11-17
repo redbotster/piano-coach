@@ -28,6 +28,58 @@ enum Palette {
     }
 }
 
+/// Geometry of the on-screen keyboard, shared with the falling-notes view so columns line up.
+struct KeyLayout {
+    let whiteWidth: CGFloat
+    let blackWidth: CGFloat
+    let blackHeight: CGFloat
+    let height: CGFloat
+    let whites: [Int]
+    let low: Int
+    let high: Int
+
+    func whiteRect(_ note: Int) -> CGRect {
+        let i = whites.firstIndex(of: note) ?? 0
+        return CGRect(x: CGFloat(i) * whiteWidth, y: 0, width: whiteWidth, height: height)
+    }
+
+    func blackRect(_ note: Int) -> CGRect {
+        let below = whites.firstIndex(of: note - 1) ?? 0
+        // Black keys sit slightly off-centre, like a real keyboard.
+        let nudge: CGFloat
+        switch Music.pc(note) {
+        case 1, 6: nudge = -0.08
+        case 3, 10: nudge = 0.08
+        default: nudge = 0
+        }
+        let centre = CGFloat(below + 1) * whiteWidth + nudge * whiteWidth
+        return CGRect(x: centre - blackWidth / 2, y: 0, width: blackWidth, height: blackHeight)
+    }
+
+    func note(at point: CGPoint) -> Int? {
+        guard point.x >= 0, point.y >= 0, point.y <= height else { return nil }
+        if point.y <= blackHeight {
+            for n in low...high where Music.isBlack(n) && blackRect(n).contains(point) { return n }
+        }
+        let i = Int(point.x / whiteWidth)
+        return whites.indices.contains(i) ? whites[i] : nil
+    }
+
+    init(size: CGSize, low: Int = Music.lowestKey, high: Int = Music.highestKey) {
+        let whites = (low...high).filter { !Music.isBlack($0) }
+        let w = size.width / CGFloat(max(1, whites.count))
+        whiteWidth = w
+        blackWidth = w * 0.6
+        blackHeight = size.height * 0.62
+        height = size.height
+        self.whites = whites
+        self.low = low
+        self.high = high
+    }
+
+    func rect(_ note: Int) -> CGRect { Music.isBlack(note) ? blackRect(note) : whiteRect(note) }
+}
+
 /// The full 61-key keyboard (C2–C7), drawn to match the Launchkey 61.
 struct KeyboardView: View {
     var marks: [Int: KeyMark]
@@ -40,51 +92,7 @@ struct KeyboardView: View {
 
     @State private var mouseNote: Int?
 
-    private var whiteKeys: [Int] { (low...high).filter { !Music.isBlack($0) } }
-
-    private struct Layout {
-        let whiteWidth: CGFloat
-        let blackWidth: CGFloat
-        let blackHeight: CGFloat
-        let height: CGFloat
-        let whites: [Int]
-        let low: Int
-        let high: Int
-
-        func whiteRect(_ note: Int) -> CGRect {
-            let i = whites.firstIndex(of: note) ?? 0
-            return CGRect(x: CGFloat(i) * whiteWidth, y: 0, width: whiteWidth, height: height)
-        }
-
-        func blackRect(_ note: Int) -> CGRect {
-            let below = whites.firstIndex(of: note - 1) ?? 0
-            // Black keys sit slightly off-centre, like a real keyboard.
-            let nudge: CGFloat
-            switch Music.pc(note) {
-            case 1, 6: nudge = -0.08
-            case 3, 10: nudge = 0.08
-            default: nudge = 0
-            }
-            let centre = CGFloat(below + 1) * whiteWidth + nudge * whiteWidth
-            return CGRect(x: centre - blackWidth / 2, y: 0, width: blackWidth, height: blackHeight)
-        }
-
-        func note(at point: CGPoint) -> Int? {
-            guard point.x >= 0, point.y >= 0, point.y <= height else { return nil }
-            if point.y <= blackHeight {
-                for n in low...high where Music.isBlack(n) && blackRect(n).contains(point) { return n }
-            }
-            let i = Int(point.x / whiteWidth)
-            return whites.indices.contains(i) ? whites[i] : nil
-        }
-    }
-
-    private func layout(_ size: CGSize) -> Layout {
-        let whites = whiteKeys
-        let w = size.width / CGFloat(max(1, whites.count))
-        return Layout(whiteWidth: w, blackWidth: w * 0.6, blackHeight: size.height * 0.62, height: size.height,
-                      whites: whites, low: low, high: high)
-    }
+    private func layout(_ size: CGSize) -> KeyLayout { KeyLayout(size: size, low: low, high: high) }
 
     var body: some View {
         GeometryReader { geo in
@@ -119,7 +127,7 @@ struct KeyboardView: View {
         }
     }
 
-    private func draw(_ context: inout GraphicsContext, layout l: Layout) {
+    private func draw(_ context: inout GraphicsContext, layout l: KeyLayout) {
         let corner = CGSize(width: 3, height: 3)
         // White keys
         for note in l.whites {

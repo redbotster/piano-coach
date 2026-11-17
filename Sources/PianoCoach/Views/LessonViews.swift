@@ -112,8 +112,8 @@ struct LessonView: View {
         switch step {
         case .info(let info): InfoStepView(info: info)
         case .checklist(let list): ChecklistStepView(list: list)
-        case .play(let task):
-            if let runner = app.runner { TaskView(runner: runner, task: task, quiz: nil) }
+        case .play:
+            if let runner = app.runner { TaskView(runner: runner, task: runner.task, quiz: nil) }
         case .quiz(let quiz):
             if let runner = app.runner { TaskView(runner: runner, task: runner.task, quiz: quiz) }
         }
@@ -145,7 +145,7 @@ struct LessonView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(app.nextLessonID == nil)
             } else {
-                let scoredButNotPassed = (app.step?.isScored ?? false) && !(app.lastResult?.passed ?? false)
+                let scoredButNotPassed = (app.step?.isScored ?? false) && !((app.lastResult?.passed ?? false) && !app.isPractice)
                 Button {
                     app.nextStep()
                 } label: {
@@ -337,15 +337,18 @@ struct TaskView: View {
                 } else if runner.phase == .countIn {
                     countInOverlay.frame(maxWidth: .infinity)
                 }
-                if !task.isTimed, quiz == nil, task.events.count > 1 {
+                if !runner.timedRun, quiz == nil, task.events.count > 1 {
                     ProgressView(value: Double(min(runner.index, task.events.count)), total: Double(task.events.count))
                         .frame(maxWidth: 420)
                 }
                 controls
+                if quiz == nil, app.stepTask?.isTimed ?? false {
+                    PracticeOptionsBar(runner: runner)
+                }
             }
 
             if let result = app.lastResult {
-                ResultView(result: result, task: task, isQuiz: quiz != nil)
+                ResultView(result: result, task: task, isQuiz: quiz != nil, practice: app.isPractice && quiz == nil)
             }
         }
     }
@@ -363,7 +366,7 @@ struct TaskView: View {
 
     private var controls: some View {
         HStack(spacing: 12) {
-            if task.isTimed {
+            if runner.timedRun {
                 if runner.phase == .ready || runner.phase == .done {
                     Button {
                         app.startTask()
@@ -374,29 +377,91 @@ struct TaskView: View {
                     .help("Space bar also starts")
                 } else {
                     Button {
-                        runner.reset()
+                        app.stopTask()
                     } label: { Label("Stop", systemImage: "stop.fill") }
                 }
                 TempoControl(runner: runner)
+                if app.options.loopOn, app.loopPass > 0 {
+                    Text("Loop pass \(app.loopPass + 1)").font(.callout).foregroundStyle(.secondary)
+                }
             } else if quiz == nil {
                 Button {
                     app.retryTask()
                 } label: { Label("Restart", systemImage: "arrow.counterclockwise") }
             }
-            if quiz == nil {
+            if quiz == nil || task.listenFirst {
                 Button {
                     app.isDemoPlaying ? app.stopDemo() : app.playDemo()
                 } label: {
-                    Label(app.isDemoPlaying ? "Stop demo" : "Demo", systemImage: app.isDemoPlaying ? "stop.fill" : "speaker.wave.2.fill")
+                    Label(app.isDemoPlaying ? "Stop" : (task.listenFirst ? "Hear again" : "Demo"),
+                          systemImage: app.isDemoPlaying ? "stop.fill" : "speaker.wave.2.fill")
                 }
-                .disabled(runner.phase == .countIn || (task.isTimed && runner.phase == .running))
+                .disabled(runner.phase == .countIn || (runner.timedRun && runner.phase == .running))
             }
             Spacer()
-            if !task.isTimed, runner.phase == .running, quiz == nil {
-                Text(task.events.count > 1 ? "Play the lit keys — the lesson waits for you." : "Play the lit key.")
+            if !runner.timedRun, runner.phase == .running, quiz == nil {
+                Text(!task.showTargets ? "Play what you read or hear — the lesson waits for you."
+                     : task.events.count > 1 ? "Play the lit keys — the lesson waits for you." : "Play the lit key.")
                     .font(.callout).foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// Hand selection, wait mode, looping and the falling-notes toggle for timed tasks.
+struct PracticeOptionsBar: View {
+    @EnvironmentObject var app: AppModel
+    @ObservedObject var runner: TaskRunner
+
+    var body: some View {
+        let idle = runner.phase == .ready || runner.phase == .done || !runner.timedRun
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 16) {
+                if app.taskHasBothHands {
+                    Picker("Hands", selection: $app.options.hand) {
+                        Text("Both").tag(Hand.either)
+                        Text("Right").tag(Hand.right)
+                        Text("Left").tag(Hand.left)
+                    }
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                    .help("Practise one hand while the app plays the other")
+                }
+                Toggle("Wait for me", isOn: $app.options.wait)
+                    .help("No metronome: the music pauses on each note until you play it")
+                Toggle("Loop bars", isOn: $app.options.loopOn)
+                    .disabled(app.options.wait)
+                    .help("Repeat a few bars at a slower tempo")
+                if app.options.loopOn, !app.options.wait {
+                    Stepper("\(app.options.loopFrom)", value: $app.options.loopFrom, in: 1...max(1, app.options.loopTo))
+                    Text("to")
+                    Stepper("\(app.options.loopTo)", value: $app.options.loopTo, in: app.options.loopFrom...max(app.options.loopFrom, app.taskBarCount))
+                    Toggle("Auto speed-up", isOn: $app.options.autoSpeed)
+                        .help("Each clean pass raises the tempo by 4 BPM until you reach the target")
+                }
+                Spacer()
+                Toggle("Falling notes", isOn: $app.fallingNotes)
+            }
+            .toggleStyle(.checkbox)
+            .disabled(!idle)
+            if app.isPractice {
+                Label(practiceNote, systemImage: "figure.walk")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+    }
+
+    private var practiceNote: String {
+        var parts: [String] = []
+        if app.options.hand == .right { parts.append("right hand only, the app plays the left") }
+        if app.options.hand == .left { parts.append("left hand only, the app plays the right") }
+        if app.options.wait { parts.append("the music waits for each note") }
+        if app.options.loopOn, !app.options.wait {
+            parts.append("looping bars \(app.options.loopFrom)–\(app.options.loopTo)" + (app.options.autoSpeed ? ", speeding up after each clean pass" : ""))
+        }
+        return "Practice mode: " + parts.joined(separator: "; ") + ". Stars are only earned with both hands, in time, on the whole passage."
     }
 }
 
@@ -425,6 +490,7 @@ struct ResultView: View {
     let result: TaskResult
     let task: PlayTask
     let isQuiz: Bool
+    var practice: Bool = false
 
     private func timingWord(_ ms: Double) -> String {
         ms <= 25 ? "excellent" : ms <= 45 ? "good" : ms <= 80 ? "fair" : "loose"
@@ -436,8 +502,9 @@ struct ResultView: View {
                 Image(systemName: result.passed ? "checkmark.circle.fill" : "arrow.counterclockwise.circle.fill")
                     .font(.system(size: 26))
                     .foregroundStyle(result.passed ? Palette.good : Palette.left)
-                Text(result.passed ? "Passed" : "Not quite — try again").font(.headline)
-                StarsView(stars: result.stars, size: 16)
+                Text(practice ? (result.passed ? "Clean practice run" : "Keep practising")
+                     : result.passed ? "Passed" : "Not quite — try again").font(.headline)
+                if !practice { StarsView(stars: result.stars, size: 16) }
             }
             HStack(alignment: .top, spacing: 26) {
                 metric("Accuracy", "\(Int((result.accuracy * 100).rounded()))%",

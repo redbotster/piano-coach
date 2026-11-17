@@ -10,7 +10,8 @@ It was built for the 61-key **Novation Launchkey 61**, and works with any MIDI k
 
 - **Shows the full 61-key keyboard** (C2–C7) and lights the keys for each step: blue for the right hand, orange for the left, with finger numbers on the keys.
 - **Listens over MIDI** and marks each note green or red as you play.
-- **Walks you through 177 lessons** that mix short explanations, a Listen/Demo button, and scored playing tasks.
+- **Walks you through 254 lessons** that mix short explanations, a Listen/Demo button, and scored playing tasks.
+- **Plans your practice**: a Today screen builds a 15–20 minute session from a warm-up, lessons due for review (spaced repetition), and what's next.
 - **Scores what a teacher would listen for:**
   - note accuracy and wrong notes
   - timing in milliseconds, including whether you rush or drag
@@ -19,9 +20,16 @@ It was built for the 61-key **Novation Launchkey 61**, and works with any MIDI k
   - legato and staccato, measured from key release times
   - voicing (top note of a chord louder) and balance between hands
   - sustain-pedal changes
-- **Draws real notation**: treble, bass and grand staff with key signatures, accidentals, rests and fingering, plus a rhythm timeline with a moving playhead.
+- **Draws real notation**: treble, bass and grand staff with key signatures, accidentals, beams, slurs, repeats, ornaments, dynamics and fingering, plus a rhythm timeline with a moving playhead.
+- **Falling notes**: notes drop onto the on-screen keys and land when they should be played.
+- **Practice aids on every timed task**: one hand at a time while the app plays the other, a wait mode that pauses on each note, and looping a few bars with automatic speed-up.
+- **Imports your own songs** from MIDI or MusicXML files and turns them into lessons.
+- **Household profiles**: each person has their own progress, history and daily plan.
+- **Progress dashboard**: charts of practice time, accuracy, timing and evenness over weeks.
 - **Plays a piano sound** through the Mac, since a MIDI controller makes no sound of its own, and a sample-accurate metronome with a count-in.
 - **Saves progress**: stars per lesson and the best clean tempo for each timed task.
+
+![Für Elise with both hands on a grand staff](docs/song.png)
 
 ![A scale lesson with staff notation and fingering](docs/staff.png)
 
@@ -44,7 +52,7 @@ The build is ad-hoc signed, not notarized, so it is meant to be built on the Mac
 ## Using it
 
 1. Connect the keyboard by USB. The toolbar shows a green dot and the device name when it is detected.
-2. Choose a lesson in the sidebar, or press **Start** on a section card.
+2. Start from **Today** for a suggested session, or choose any lesson in the sidebar.
 3. Read each step, press **Listen** or **Demo** to hear it, then play.
 
 There are two kinds of playing task:
@@ -55,6 +63,29 @@ There are two kinds of playing task:
 | **Timed** | Press **Start** (or Space). After a count-in, play along with the metronome while the playhead moves. Use the BPM − / + buttons to slow down or speed up. |
 
 After each task you get a result card with the numbers and one to three stars.
+
+### Practice aids
+
+Under every timed task:
+
+| Option | What it does |
+|---|---|
+| **Hands: Both / Right / Left** | Practise one hand while the app plays the other. |
+| **Wait for me** | No metronome. The music pauses on each note until you play it. |
+| **Loop bars** | Repeats a range of bars, starting at 70% tempo. With **Auto speed-up**, each clean pass adds 4 BPM until you reach the target. |
+| **Falling notes** | Shows or hides the falling-notes view above the keyboard. |
+
+Using any of the first three puts the step in practice mode: you still get a result, but stars are only earned with both hands, in time, on the whole passage.
+
+### Your own songs
+
+Choose **Import a song…** in the sidebar (⌘I) and pick a MIDI (`.mid`) or MusicXML (`.musicxml`, `.xml`, `.mxl`) file. The song appears under **My Songs**, split into sections of a few bars plus full run-throughs, with hands assigned from the file's staves or tracks. Right-click a song to remove it.
+
+This is how to learn music that can't ship with the app. Songs from shows such as *The Phantom of the Opera* and *Rent* are under copyright, so they are not built in; import an arrangement you own instead. Imported songs stay on your Mac.
+
+### Profiles
+
+The person menu in the toolbar switches between profiles and adds, renames or deletes them. Each profile has its own progress, stars, history and daily plan. Imported songs and settings are shared.
 
 ### No keyboard handy?
 
@@ -69,6 +100,8 @@ You can click the on-screen keys, or type on the Mac keyboard:
 | `⌘→` / `⌘←` | next / previous step |
 | `⌘R` | restart the step |
 | `⌘D` | play the demo |
+| `⌘1` | Today |
+| `⌘I` | import a song |
 | `⌘0` | free play |
 
 Mouse and typed notes use a fixed velocity, so tasks that score dynamics or accents need a real keyboard.
@@ -83,13 +116,14 @@ Mouse and typed notes use a fixed velocity, so tasks that score dynamics or acce
 ### Settings
 
 - **Piano sound** on or off (turn it off if a DAW or synth is already sounding).
-- **Latency compensation**, for when results always read late, which is common with Bluetooth headphones.
+- **Latency calibration**: tap along with eight clicks and the app sets the compensation for you (or use the slider). Useful when results always read late, which is common with Bluetooth headphones.
+- **Piano sound**: load any SoundFont (`.sf2`) for a richer piano than the built-in one.
 - **Key names** on the on-screen keyboard: off, C only, or all keys.
-- **Reset progress.**
+- **Reset progress** for the current profile.
 
 ## Curriculum
 
-177 lessons in four sections.
+254 lessons in six sections.
 
 ### 1. Foundations (19 lessons)
 
@@ -149,14 +183,42 @@ Mouse and typed notes use a fixed velocity, so tasks that score dynamics or acce
 | Exercise traditions | 6 | studies in the style of Hanon, Czerny, Burgmüller, Pischna, Dohnányi, Chopin/Liszt |
 | Skill tests | 4 | evenness, clean-speed ladder, timing consistency, voicing |
 
+### 5. Ear Training (38 lessons)
+
+| Unit | Lessons | Covers |
+|---|---|---|
+| Pitch | 5 | higher or lower, matching notes, black keys, finding a note with no reference |
+| Steps, skips and direction | 4 | contour, step vs. skip, three-note shapes |
+| Intervals | 7 | 2nds through octaves, ascending, descending and harmonic |
+| Scale degrees | 6 | tonic, degrees in C, G and F, minor keys, major vs. minor |
+| Chords | 6 | major/minor, diminished/augmented, inversions, sevenths, progressions |
+| Echo | 6 | melodic playback from 3 to 8 notes, pentatonic, full scale, rhythm |
+| Playing by ear | 4 | working out tunes, transposing them, harmonising with I, IV, V |
+
+The app plays the prompt, hides the key lights, and you play back what you heard.
+
+### 6. Songs (39 lessons)
+
+| Unit | Lessons | Includes |
+|---|---|---|
+| First songs | 8 | Ode to Joy, Twinkle Twinkle, Frère Jacques, Jingle Bells, When the Saints |
+| Folk and traditional | 6 | Happy Birthday, Amazing Grace, Auld Lang Syne, Silent Night |
+| Classics | 14 | Minuet in G, Canon in D, Für Elise, Prelude in C, Gymnopédie No. 1, Moonlight Sonata, Rondo alla Turca |
+| Stage and screen | 5 | Can-Can, Toreador Song, Swan Lake, Daisy Bell, Take Me Out to the Ball Game |
+| Getting ready for modern musicals | 6 | original exercises: four-chord vamps, syncopated comping, ballad arpeggios, dramatic minor, power-ballad build, sus and slash chords |
+
+Every built-in piece is in the public domain, mostly as excerpts in simple arrangements. Each lesson goes right hand, left hand, hands together slowly, then performance tempo.
+
 ## Limitations
 
 - **MIDI can't see your body.** Posture, hand shape and relaxation are taught with self-check lists and links to video searches, not verified.
-- **Some notation is described, not drawn.** Repeats, D.S./Coda, 8va, slurs and ornament signs are explained in text, then played from a written-out version.
+- **Some notation is simplified.** Accidentals are printed on every altered note, clef changes are shown by moving between staves, and the segno and coda are text labels.
+- **Song melodies were written from memory**, not checked against scores, so a few may contain wrong notes. Broadway standards that are now public domain (Gershwin, Kern, Cohan, Gilbert & Sullivan) were left out for that reason.
+- **Song import is basic.** Only the first tempo, meter and key of a file are used, repeats are not expanded, and imported notes have no fingering.
 - **Held notes aren't verified.** Held-finger exercises score only the notes you strike.
 - **Enharmonic key labels are simplified.** E♯ is labelled F and B♯ is labelled C on the keys.
 - **Random sight-reading material** is generated at launch, so it changes each time the app starts rather than on each retry.
-- **Testing so far is automated.** Every lesson passes a validity check and the scoring engine passes tests with simulated input, but the lesson text has not been fully proofread and the app has not been tested end to end with a physical keyboard.
+- **Testing so far is automated.** Every lesson passes a validity check, and the scoring engine, song importer, practice plan and profiles pass their own tests. The lesson text has had one proofreading pass. The app has not been tested end to end with a physical keyboard.
 
 ## Development
 
@@ -164,7 +226,7 @@ Mouse and typed notes use a fixed velocity, so tasks that score dynamics or acce
 swift build                                     # debug build
 .build/debug/PianoCoach                         # run without packaging
 .build/debug/PianoCoach --check -v              # validate every lesson
-.build/debug/PianoCoach --selftest              # scoring-engine tests with synthetic input
+.build/debug/PianoCoach --selftest              # engine, import, plan and profile tests
 .build/debug/PianoCoach --snapshot out/ <id>    # render a lesson's steps to PNG
 scripts/build-app.sh                            # release build + .app bundle
 ```
@@ -174,12 +236,13 @@ scripts/build-app.sh                            # release build + .app bundle
 ```
 Sources/PianoCoach/
   Core/        music theory, lesson model, lesson DSL
-  Engine/      CoreMIDI input, piano sound and metronome, scoring, app state
+  Engine/      CoreMIDI input, piano sound and metronome, scoring, practice plan,
+               history, profiles, song import, app state
   Views/       keyboard, staff, rhythm lane, lesson screens
   Curriculum/  the lessons
 ```
 
-There are no third-party dependencies. The app is SwiftUI with CoreMIDI and AVFoundation, built with Swift Package Manager.
+There are no third-party dependencies. The app is SwiftUI with CoreMIDI, AVFoundation and Swift Charts, built with Swift Package Manager.
 
 ### Writing a lesson
 
@@ -204,7 +267,11 @@ lesson("foundations.example", "C position", "Five notes under five fingers.", [
 
 Rhythm tokens are `w h q e s t` (whole to 32nd), with `.` for dots, `r` for rests, `3`/`5`/`6` prefixes for tuplets, and `~` for ties. Run `--check` after editing; it catches notes off the keyboard, impossible hand spans, duplicate ids and bad timing.
 
-Progress is stored in `~/Library/Application Support/PianoCoach/progress.json`.
+Data lives in `~/Library/Application Support/PianoCoach/`: one folder per profile under `Profiles/` (progress and history) and imported songs under `Songs/`.
+
+### Releases
+
+Pushing a tag like `v1.0` runs `.github/workflows/release.yml`, which builds the app and attaches a zip to a GitHub release. The build is not notarized (that needs an Apple Developer ID), so the first launch needs right-click → Open.
 
 ## License
 

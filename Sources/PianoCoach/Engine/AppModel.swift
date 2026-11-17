@@ -16,14 +16,10 @@ struct LessonRecord: Codable {
 final class ProgressStore: ObservableObject {
     @Published var records: [String: LessonRecord] = [:]
 
-    private let url: URL = {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("PianoCoach", isDirectory: true)
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        return base.appendingPathComponent("progress.json")
-    }()
+    private let url: URL
 
-    init() {
+    init(url: URL) {
+        self.url = url
         if let data = try? Data(contentsOf: url),
            let decoded = try? JSONDecoder().decode([String: LessonRecord].self, from: data) {
             records = decoded
@@ -50,6 +46,16 @@ enum LabelMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// Per-step practice aids. Any of them puts the step in practice mode (results are not recorded).
+struct PracticeOptions: Equatable {
+    var hand: Hand = .either     // .either = both hands
+    var wait = false
+    var loopOn = false
+    var loopFrom = 1             // bars, 1-based, inclusive
+    var loopTo = 1
+    var autoSpeed = true
+}
+
 struct KeyMark {
     enum Kind { case target, info, demo, good, bad }
     var kind: Kind
@@ -61,8 +67,9 @@ struct KeyMark {
 final class AppModel: ObservableObject {
     let midi = MIDIManager()
     let audio = AudioEngine()
-    let progress = ProgressStore()
-    let history = HistoryStore()
+    let profiles: ProfileStore
+    private(set) var progress: ProgressStore
+    private(set) var history: HistoryStore
     let library = SongLibrary()
     @Published private(set) var sections: [CurriculumSection] = Curriculum.sections
 
@@ -104,11 +111,33 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var typingOctave = 4
+    @Published var fallingNotes: Bool { didSet { UserDefaults.standard.set(fallingNotes, forKey: "fallingNotes") } }
+    @Published var soundFontPath: String? {
+        didSet {
+            UserDefaults.standard.set(soundFontPath, forKey: "soundFontPath")
+        }
+    }
+
+    // Practice aids for the current step
+    @Published var options = PracticeOptions() {
+        didSet { if oldValue != options, !suppressOptionChange { applyOptions(from: oldValue) } }
+    }
+    @Published var loopPass = 0
+    private var suppressOptionChange = false
+    private var baseTask: PlayTask?
+    private var accompaniment: [ExpectedEvent] = []
+    private var loopActive = false
+
+    // Latency calibration
+    @Published var calibration: TaskRunner?
+    @Published var calibrationMessage: String?
+    private var calibrationSink: AnyCancellable?
 
     private var librarySink: AnyCancellable?
     private var runnerSink: AnyCancellable?
     private var midiSink: AnyCancellable?
     private var demoWork: [DispatchWorkItem] = []
+    private var silentDemoNotes: Set<Int> = []
     private var keyMonitor: Any?
     private var typedDown: Set<UInt16> = []
     private var tempoOverride: [String: Double] = [:]
@@ -117,11 +146,19 @@ final class AppModel: ObservableObject {
     private(set) var lessonOrder: [String] = []
 
     init() {
+        let profiles = ProfileStore()
+        self.profiles = profiles
+        progress = ProgressStore(url: profiles.progressURL)
+        history = HistoryStore(url: profiles.historyURL)
+        PracticePlan.profileKey = "." + profiles.currentID
         let defaults = UserDefaults.standard
         soundOn = defaults.object(forKey: "soundOn") as? Bool ?? true
         labelMode = LabelMode(rawValue: defaults.string(forKey: "labelMode") ?? "") ?? .cOnly
         latencyMs = defaults.object(forKey: "latencyMs") as? Double ?? 0
         padLights = defaults.bool(forKey: "padLights")
+        fallingNotes = defaults.object(forKey: "fallingNotes") as? Bool ?? true
+        soundFontPath = defaults.string(forKey: "soundFontPath")
+        if let path = soundFontPath, !audio.loadInstrument(from: URL(fileURLWithPath: path)) { soundFontPath = nil }
 
         rebuildIndex()
         librarySink = library.objectWillChange.sink { [weak self] in
@@ -183,7 +220,106 @@ final class AppModel: ObservableObject {
         rebuildIndex()
     }
 
+    // MARK: Sound and calibration
+
+    func chooseSoundFont() {
+        let panel = NSOpenPanel()
+        panel.allowedFileTypes = ["sf2", "dls"]
+        panel.message = "Choose a SoundFont (.sf2) or DLS file with a piano as its first instrument"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if audio.loadInstrument(from: url) {
+            soundFontPath = url.path
+        } else {
+            let alert = NSAlert()
+            alert.messageText = "That file could not be loaded"
+            alert.informativeText = "The built-in piano is still in use."
+            alert.runModal()
+        }
+    }
+
+    func resetSoundFont() {
+        audio.loadInstrument(from: nil)
+        soundFontPath = nil
+    }
+
+    /// Eight clicks: the learner taps along and the average offset becomes the latency compensation.
+    func startCalibration() {
+        stopTask()
+        calibrationMessage = nil
+        let task = L.timedTask("Calibration", "", L.rhythm("q q q q q q q q", count: false), bpm: 90)
+        let r = TaskRunner(task: task)
+        r.audio = audio
+        r.latencyMs = 0
+        r.onFinish = { [weak self] result in
+            guard let self else { return }
+            if result.correct >= 6, let offset = result.meanDeviationMs {
+                let value = min(150, max(0, (offset / 5).rounded() * 5))
+                self.latencyMs = value
+                self.calibrationMessage = "You tapped \(Int(offset.rounded())) ms \(offset >= 0 ? "after" : "before") the clicks on average. Compensation set to \(Int(value)) ms."
+            } else {
+                self.calibrationMessage = "Not enough taps landed near the clicks. Try again and tap once per click."
+            }
+            self.calibration = nil
+            self.calibrationSink = nil
+        }
+        calibrationSink = r.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
+        calibration = r
+        r.start()
+    }
+
+    func cancelCalibration() {
+        calibration?.stop()
+        calibration = nil
+        calibrationSink = nil
+    }
+
+    // MARK: Profiles
+
+    /// Point progress, history and the practice plan at the current profile.
+    private func loadCurrentProfile() {
+        history.saveNow()
+        clearStepState()
+        progress = ProgressStore(url: profiles.progressURL)
+        history = HistoryStore(url: profiles.historyURL)
+        PracticePlan.profileKey = "." + profiles.currentID
+        tempoOverride = [:]
+        selectedLessonID = Self.todayID
+        objectWillChange.send()
+    }
+
+    func switchProfile(_ id: String) {
+        guard id != profiles.currentID else { return }
+        profiles.select(id)
+        loadCurrentProfile()
+    }
+
+    func addProfile(name: String) {
+        profiles.add(name: name)
+        loadCurrentProfile()
+    }
+
+    func renameProfile(to name: String) {
+        profiles.rename(profiles.currentID, to: name)
+        objectWillChange.send()
+    }
+
+    func deleteCurrentProfile() {
+        guard profiles.profiles.count > 1 else { return }
+        let id = profiles.currentID
+        history.reset()
+        PracticePlan.clearCache()
+        profiles.delete(id)
+        loadCurrentProfile()
+    }
+
+    func resetAllProgress() {
+        progress.reset()
+        history.reset()
+        PracticePlan.clearCache()
+    }
+
     func shutdown() {
+        history.saveNow()
         midi.setPadLights(enabled: false)
         audio.allNotesOff()
     }
@@ -257,6 +393,7 @@ final class AppModel: ObservableObject {
     }
 
     private func clearStepState() {
+        loopActive = false
         stopDemo()
         runner?.stop()
         runner = nil
@@ -270,6 +407,10 @@ final class AppModel: ObservableObject {
         clearStepState()
         quizRound = 0
         quizCorrect = 0
+        suppressOptionChange = true
+        options = PracticeOptions()
+        suppressOptionChange = false
+        baseTask = nil
         switch step {
         case .play(let task): attach(task)
         case .quiz(let quiz): attach(quiz.make(0))
@@ -279,9 +420,99 @@ final class AppModel: ObservableObject {
 
     private func tempoKey() -> String { "\(selectedLessonID ?? "")#\(stepIndex)" }
 
-    private func attach(_ task: PlayTask) {
+    /// True when a practice aid is on; such attempts are not saved to progress or history.
+    var isPractice: Bool { options.hand != .either || options.wait || options.loopOn }
+
+    /// The step's task before practice aids are applied.
+    var stepTask: PlayTask? { baseTask }
+
+    var taskHasBothHands: Bool {
+        guard let base = baseTask else { return false }
+        let hands = Set(base.events.flatMap { $0.notes.map { $0.hand } })
+        return hands.contains(.left) && hands.contains(.right)
+    }
+
+    var taskBarCount: Int {
+        guard let base = baseTask, let config = base.timedConfig else { return 1 }
+        return max(1, Int((base.totalBeats / Double(config.beatsPerBar)).rounded(.up)))
+    }
+
+    /// Apply loop range and hand selection. Returns the task to play and the notes the app plays along.
+    private func effectiveTask(_ base: PlayTask) -> (PlayTask, [ExpectedEvent]) {
+        var task = base
+        var others: [ExpectedEvent] = []
+        if options.loopOn, var config = base.timedConfig {
+            let bar = Double(config.beatsPerBar)
+            let from = Double(max(1, options.loopFrom) - 1) * bar
+            let to = Double(max(options.loopFrom, options.loopTo)) * bar
+            let slice = base.events.filter { $0.beat >= from - 1e-6 && $0.beat < to - 1e-6 }
+            if !slice.isEmpty {
+                task.events = slice.map { var e = $0; e.beat -= from; return e }
+                config.totalBeats = to - from
+                config.tempoEnd = nil
+                task.timing = .timed(config)
+                task.markers = base.markers.filter { $0.beat >= from - 1e-6 && $0.beat < to - 1e-6 }
+                    .map { var m = $0; m.beat -= from; return m }
+                task.repeats = []
+            }
+        }
+        if options.hand != .either {
+            let total = task.totalBeats
+            var mine: [ExpectedEvent] = []
+            for event in task.events {
+                if event.isAnyKey { mine.append(event); continue }
+                let keep = event.notes.filter { $0.hand == options.hand || $0.hand == .either }
+                let rest = event.notes.filter { !($0.hand == options.hand || $0.hand == .either) }
+                if !keep.isEmpty {
+                    var e = event
+                    e.notes = keep
+                    if let d = keep.compactMap({ $0.duration }).max() { e.duration = d }
+                    mine.append(e)
+                }
+                if !rest.isEmpty {
+                    var e = event
+                    e.notes = rest
+                    if let d = rest.compactMap({ $0.duration }).max() { e.duration = d }
+                    others.append(e)
+                }
+            }
+            if mine.isEmpty {
+                others = []
+            } else {
+                task.events = mine
+                if var config = task.timedConfig {
+                    config.totalBeats = total
+                    task.timing = .timed(config)
+                }
+            }
+        }
+        return (task, others)
+    }
+
+    private func applyOptions(from old: PracticeOptions) {
+        guard let base = baseTask else { return }
+        loopActive = false
+        stopDemo()
+        if options.loopOn, !old.loopOn, let config = base.timedConfig {
+            // Looping starts slower so the passage can be played cleanly, then climbs.
+            if tempoOverride[tempoKey()] == nil {
+                tempoOverride[tempoKey()] = max(40, (config.bpm * 0.7 / 4).rounded() * 4)
+            }
+            suppressOptionChange = true
+            options.loopFrom = min(max(1, options.loopFrom), taskBarCount)
+            options.loopTo = min(max(options.loopFrom, options.loopTo), taskBarCount)
+            suppressOptionChange = false
+        }
+        loopPass = 0
+        attach(base, isBase: true)
+    }
+
+    private func attach(_ base: PlayTask, isBase: Bool = true) {
         runner?.stop()
-        let r = TaskRunner(task: task, bpm: tempoOverride[tempoKey()])
+        baseTask = base
+        let (task, others) = effectiveTask(base)
+        accompaniment = others
+        let r = TaskRunner(task: task, bpm: tempoOverride[tempoKey()], waitMode: options.wait)
         r.audio = audio
         r.latencyMs = latencyMs
         r.onFinish = { [weak self] result in self?.taskFinished(result) }
@@ -292,6 +523,12 @@ final class AppModel: ObservableObject {
         runnerSink = r.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
         runner = r
         lastResult = nil
+        if task.listenFirst {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self, weak r] in
+                guard let self, let r, self.runner === r, r.phase != .done else { return }
+                self.playDemo()
+            }
+        }
     }
 
     func setTempo(_ bpm: Double) {
@@ -303,9 +540,28 @@ final class AppModel: ObservableObject {
 
     func startTask() {
         stopDemo()
-        runner?.latencyMs = latencyMs
-        runner?.start()
+        guard let runner else { return }
+        runner.latencyMs = latencyMs
+        runner.start()
         lastResult = nil
+        loopActive = options.loopOn
+        // Play the hand the learner is not practising.
+        for event in accompaniment {
+            let on = runner.startTime + runner.tempo.time(event.beat) - HostClock.now()
+            let off = runner.startTime + runner.tempo.time(event.beat + event.duration * 0.92) - HostClock.now()
+            let notes = event.notes.map { $0.midi }
+            guard on > 0 else { continue }
+            schedule(after: on) { [weak self] in for n in notes { self?.audio.noteOn(n, velocity: 58) } }
+            schedule(after: max(on + 0.05, off)) { [weak self] in for n in notes { self?.audio.noteOff(n) } }
+        }
+    }
+
+    /// Stop a running timed task (and any loop).
+    func stopTask() {
+        loopActive = false
+        stopDemo()
+        for event in accompaniment { for spec in event.notes { audio.noteOff(spec.midi) } }
+        runner?.reset()
     }
 
     func retryTask() {
@@ -317,9 +573,8 @@ final class AppModel: ObservableObject {
             quizCorrect = 0
             quizDone = false
             attach(quiz.make(0))
-        } else if runner.task.isTimed {
-            runner.reset()
         } else {
+            loopActive = false
             runner.reset()
         }
     }
@@ -348,6 +603,22 @@ final class AppModel: ObservableObject {
             }
             return
         }
+        if isPractice {
+            lastResult = result
+            guard options.loopOn, loopActive, let runner, let config = baseTask?.timedConfig else { return }
+            loopPass += 1
+            if options.autoSpeed, result.accuracy >= 0.95, result.wrongNotes == 0, (result.meanAbsDeviationMs ?? 999) <= 70,
+               runner.bpm < config.bpm {
+                let next = min(config.bpm, runner.bpm + 4)
+                tempoOverride[tempoKey()] = next
+                runner.bpm = next
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { [weak self, weak runner] in
+                guard let self, let runner, self.runner === runner, self.loopActive else { return }
+                self.startTask()
+            }
+            return
+        }
         lastResult = result
         let index = stepIndex
         history.record(Attempt(date: Date(), lessonID: lesson.id, step: index, accuracy: result.accuracy,
@@ -367,6 +638,7 @@ final class AppModel: ObservableObject {
     var demoTask: PlayTask? {
         switch step {
         case .play: return runner?.task
+        case .quiz: return (runner?.task.listenFirst ?? false) ? runner?.task : nil
         case .info(let info): return info.example
         default: return nil
         }
@@ -377,12 +649,14 @@ final class AppModel: ObservableObject {
         stopDemo()
         if let runner, runner.phase == .countIn || (runner.phase == .running && task.isTimed) { runner.reset() }
         let bpm = task.isTimed ? (runner?.bpm ?? task.timedConfig?.bpm ?? 80) : 100
+        // Reading and ear tasks must not give the answer away on the keyboard.
+        let reveal = task.showTargets
         let config = task.timedConfig
         let endBpm = config?.tempoEnd.map { $0 * bpm / (config?.bpm ?? bpm) } ?? bpm
         let tempo = TempoMap(bpm0: bpm, bpm1: endBpm, total: task.totalBeats)
         isDemoPlaying = true
         var end = 0.0
-        for event in task.events {
+        for event in task.prompt ?? task.events {
             let notes = event.isAnyKey ? [60] : event.notes.map { $0.midi }
             let on = tempo.time(event.beat) + 0.15
             let gate = event.articulation == .staccato ? 0.4 : 0.92
@@ -391,11 +665,14 @@ final class AppModel: ObservableObject {
             let velocity = event.accent ? 110 : 76
             schedule(after: on) { [weak self] in
                 guard let self else { return }
-                for n in notes { self.audio.noteOn(n, velocity: velocity); self.demoNotes.insert(n) }
+                for n in notes {
+                    self.audio.noteOn(n, velocity: velocity)
+                    if reveal { self.demoNotes.insert(n) } else { self.silentDemoNotes.insert(n) }
+                }
             }
             schedule(after: max(on + 0.05, off)) { [weak self] in
                 guard let self else { return }
-                for n in notes { self.audio.noteOff(n); self.demoNotes.remove(n) }
+                for n in notes { self.audio.noteOff(n); self.demoNotes.remove(n); self.silentDemoNotes.remove(n) }
             }
         }
         schedule(after: end + 0.2) { [weak self] in self?.isDemoPlaying = false }
@@ -410,8 +687,9 @@ final class AppModel: ObservableObject {
     func stopDemo() {
         demoWork.forEach { $0.cancel() }
         demoWork = []
-        for n in demoNotes { audio.noteOff(n) }
+        for n in demoNotes.union(silentDemoNotes) { audio.noteOff(n) }
         demoNotes = []
+        silentDemoNotes = []
         isDemoPlaying = false
     }
 
@@ -426,7 +704,11 @@ final class AppModel: ObservableObject {
             if recentVelocities.count > 32 { recentVelocities.removeFirst() }
             outOfRange = note < Music.lowestKey || note > Music.highestKey
             if soundOn { audio.noteOn(note, velocity: velocity) }
-            runner?.noteOn(note, velocity: velocity, time: time)
+            if let calibration {
+                calibration.noteOn(note, velocity: velocity, time: time)
+            } else {
+                runner?.noteOn(note, velocity: velocity, time: time)
+            }
         case .noteOff(let note, let time):
             pressed[note] = nil
             audio.noteOff(note)
@@ -449,7 +731,7 @@ final class AppModel: ObservableObject {
             if event.type == .keyDown, !event.isARepeat {
                 if event.keyCode == 6 { self.typingOctave = max(2, self.typingOctave - 1); return nil }   // Z
                 if event.keyCode == 7 { self.typingOctave = min(6, self.typingOctave + 1); return nil }   // X
-                if event.keyCode == 49, let runner = self.runner, runner.task.isTimed,
+                if event.keyCode == 49, self.calibration == nil, let runner = self.runner, runner.timedRun,
                    runner.phase == .ready || runner.phase == .done {                                     // space
                     self.startTask()
                     return nil
