@@ -2,7 +2,7 @@ import Foundation
 
 /// The whole course. Each section lives in its own file as an extension.
 enum Curriculum {
-    static let sections: [CurriculumSection] = [foundations, rhythm, reading, technique]
+    static let sections: [CurriculumSection] = [foundations, rhythm, reading, technique, earTraining, songs]
 
     static func lesson(_ id: String, _ title: String, _ summary: String, _ steps: [Step]) -> Lesson {
         Lesson(id: id, title: title, summary: summary, steps: steps)

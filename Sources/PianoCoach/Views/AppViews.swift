@@ -12,8 +12,12 @@ struct ContentView: View {
                 Group {
                     if let lesson = app.lesson {
                         LessonView(lesson: lesson).id(lesson.id)
-                    } else {
+                    } else if app.selectedLessonID == AppModel.progressID {
+                        ProgressDashboard()
+                    } else if app.selectedLessonID == AppModel.freePlayID {
                         FreePlayView()
+                    } else {
+                        TodayView()
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -24,9 +28,9 @@ struct ContentView: View {
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button {
-                    app.selectedLessonID = nil
-                } label: { Label("Free play", systemImage: "pianokeys") }
-                .help("Free play and overview")
+                    app.selectedLessonID = AppModel.todayID
+                } label: { Label("Today", systemImage: "sun.max") }
+                .help("Today's practice plan")
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 MIDIStatusView()
@@ -68,12 +72,27 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $app.selectedLessonID) {
+            Section {
+                Label("Today", systemImage: "sun.max").tag(Optional(AppModel.todayID))
+                Label("Progress", systemImage: "chart.line.uptrend.xyaxis").tag(Optional(AppModel.progressID))
+                Label("Free play", systemImage: "pianokeys").tag(Optional(AppModel.freePlayID))
+                Button {
+                    app.importSong()
+                } label: { Label("Import a song…", systemImage: "square.and.arrow.down") }
+                .buttonStyle(.plain)
+                .help("Add a MIDI or MusicXML file to My Songs")
+            }
             ForEach(app.sections) { section in
                 Section {
                     ForEach(section.units) { unit in
                         DisclosureGroup(isExpanded: binding(unit.id)) {
                             ForEach(unit.lessons) { lesson in
                                 LessonRow(lesson: lesson).tag(Optional(lesson.id))
+                                    .contextMenu {
+                                        if app.library.contains(lesson.id) {
+                                            Button("Remove from My Songs", role: .destructive) { app.removeImportedSong(lesson.id) }
+                                        }
+                                    }
                             }
                         } label: {
                             HStack {

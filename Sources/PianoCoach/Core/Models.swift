@@ -106,6 +106,24 @@ enum Articulation {
     case staccato, tenuto, accent
 }
 
+/// Ornament sign drawn above a note (the events themselves hold the notes actually played).
+enum Ornament {
+    case trill, mordent, turn, acciaccatura, appoggiatura
+}
+
+/// Text placed above (or below) the staff at a beat: "p", "cresc.", "Fine", "D.C. al Fine", "8va", "1.", "Ped."
+struct StaffMarker {
+    var beat: Double
+    var text: String
+    var below: Bool = false
+}
+
+/// A repeated passage: repeat signs are drawn at `start` and `end` (in beats).
+struct RepeatSpan {
+    var start: Double
+    var end: Double
+}
+
 /// Something the learner must play: one note, a chord, or (when `notes` is empty) any key.
 struct ExpectedEvent {
     var notes: [NoteSpec]
@@ -116,6 +134,11 @@ struct ExpectedEvent {
     var label: String? = nil
     var accent: Bool = false
     var articulation: Articulation? = nil
+    /// A slur begins / ends on this event (drawn on the staff).
+    var slurStart: Bool = false
+    var slurEnd: Bool = false
+    var ornament: Ornament? = nil
+    var fermata: Bool = false
 
     var isAnyKey: Bool { notes.isEmpty }
 }
@@ -196,6 +219,13 @@ struct PlayTask {
     var rules: [Rule] = []
     var passAccuracy: Double = 0.8
     var timingToleranceMs: Double = 110
+    /// Notation extras drawn on the staff.
+    var markers: [StaffMarker] = []
+    var repeats: [RepeatSpan] = []
+    /// Ear training: the app plays the prompt automatically before the learner answers.
+    var listenFirst: Bool = false
+    /// What Listen/Demo plays, when it differs from `events` (e.g. a reference note then the answer).
+    var prompt: [ExpectedEvent]? = nil
 
     var isTimed: Bool {
         if case .timed = timing { return true }

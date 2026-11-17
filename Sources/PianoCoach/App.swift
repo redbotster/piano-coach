@@ -34,7 +34,9 @@ struct PianoCoachApp: App {
                 Button("Play Demo") { app.playDemo() }.keyboardShortcut("d", modifiers: .command)
                 Divider()
                 Button("Next Lesson") { app.goToNextLesson() }.keyboardShortcut(.rightArrow, modifiers: [.command, .shift])
-                Button("Free Play") { app.selectedLessonID = nil }.keyboardShortcut("0", modifiers: .command)
+                Button("Today") { app.selectedLessonID = AppModel.todayID }.keyboardShortcut("1", modifiers: .command)
+                Button("Import a Song…") { app.importSong() }.keyboardShortcut("i", modifiers: .command)
+                Button("Free Play") { app.selectedLessonID = AppModel.freePlayID }.keyboardShortcut("0", modifiers: .command)
             }
         }
         Settings {

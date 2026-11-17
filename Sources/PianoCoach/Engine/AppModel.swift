@@ -7,6 +7,10 @@ struct LessonRecord: Codable {
     var stars = 0
     var stepStars: [Int: Int] = [:]
     var bestBPM: [Int: Double] = [:]
+    // Spaced repetition (see PracticePlan)
+    var lastPracticed: Date? = nil
+    var reviewIntervalDays: Double? = nil
+    var due: Date? = nil
 }
 
 final class ProgressStore: ObservableObject {
@@ -58,7 +62,14 @@ final class AppModel: ObservableObject {
     let midi = MIDIManager()
     let audio = AudioEngine()
     let progress = ProgressStore()
-    let sections: [CurriculumSection] = Curriculum.sections
+    let history = HistoryStore()
+    let library = SongLibrary()
+    @Published private(set) var sections: [CurriculumSection] = Curriculum.sections
+
+    /// Sidebar destinations that are not lessons.
+    static let todayID = "@today"
+    static let progressID = "@progress"
+    static let freePlayID = "@free"
 
     // Navigation
     @Published var selectedLessonID: String? { didSet { if oldValue != selectedLessonID { openLesson() } } }
@@ -94,6 +105,7 @@ final class AppModel: ObservableObject {
     }
     @Published var typingOctave = 4
 
+    private var librarySink: AnyCancellable?
     private var runnerSink: AnyCancellable?
     private var midiSink: AnyCancellable?
     private var demoWork: [DispatchWorkItem] = []
@@ -111,13 +123,9 @@ final class AppModel: ObservableObject {
         latencyMs = defaults.object(forKey: "latencyMs") as? Double ?? 0
         padLights = defaults.bool(forKey: "padLights")
 
-        for section in sections {
-            for unit in section.units {
-                for lesson in unit.lessons {
-                    lessonIndex[lesson.id] = (section, unit, lesson)
-                    lessonOrder.append(lesson.id)
-                }
-            }
+        rebuildIndex()
+        librarySink = library.objectWillChange.sink { [weak self] in
+            DispatchQueue.main.async { self?.rebuildIndex() }
         }
         midi.onEvent = { [weak self] event in self?.handle(event) }
         midiSink = midi.objectWillChange.sink { [weak self] in
@@ -129,8 +137,50 @@ final class AppModel: ObservableObject {
         }
         if padLights { midi.setPadLights(enabled: true) }
         installTypingKeyboard()
-        selectedLessonID = defaults.string(forKey: "lastLesson").flatMap { lessonIndex[$0] != nil ? $0 : nil }
-        if selectedLessonID != nil { openLesson() }
+        selectedLessonID = defaults.string(forKey: "lastLesson").flatMap { lessonIndex[$0] != nil ? $0 : nil } ?? Self.todayID
+        openLesson()
+    }
+
+    private func rebuildIndex() {
+        sections = Curriculum.sections + (library.section.map { [$0] } ?? [])
+        lessonIndex = [:]
+        lessonOrder = []
+        for section in sections {
+            for unit in section.units {
+                for lesson in unit.lessons {
+                    lessonIndex[lesson.id] = (section, unit, lesson)
+                    lessonOrder.append(lesson.id)
+                }
+            }
+        }
+    }
+
+    /// Ask for a MIDI or MusicXML file and add it to My Songs.
+    func importSong() {
+        let panel = NSOpenPanel()
+        panel.allowedFileTypes = ["mid", "midi", "musicxml", "xml", "mxl"]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose MIDI or MusicXML files to add to My Songs"
+        guard panel.runModal() == .OK else { return }
+        var lastID: String?
+        var failures: [String] = []
+        for url in panel.urls {
+            do { lastID = try library.importFile(at: url) } catch { failures.append("\(url.lastPathComponent): \(error.localizedDescription)") }
+        }
+        rebuildIndex()
+        if let lastID, lessonIndex[lastID] != nil { selectedLessonID = lastID }
+        if !failures.isEmpty {
+            let alert = NSAlert()
+            alert.messageText = "Some files could not be imported"
+            alert.informativeText = failures.joined(separator: "\n")
+            alert.runModal()
+        }
+    }
+
+    func removeImportedSong(_ id: String) {
+        if selectedLessonID == id { selectedLessonID = Self.todayID }
+        library.remove(id: id)
+        rebuildIndex()
     }
 
     func shutdown() {
@@ -194,6 +244,7 @@ final class AppModel: ObservableObject {
         clearStepState()
         let scored = lesson.steps.indices.filter { lesson.steps[$0].isScored }
         progress.update(lesson.id) { record in
+            PracticePlan.reschedule(&record, stars: scored.isEmpty ? 3 : Int((Double(scored.reduce(0) { $0 + (record.stepStars[$1] ?? 0) }) / Double(scored.count)).rounded()), now: Date())
             record.completed = true
             if scored.isEmpty {
                 record.stars = 3
@@ -299,6 +350,9 @@ final class AppModel: ObservableObject {
         }
         lastResult = result
         let index = stepIndex
+        history.record(Attempt(date: Date(), lessonID: lesson.id, step: index, accuracy: result.accuracy,
+                               timingMs: result.meanAbsDeviationMs, evenness: result.velocityStdDev,
+                               bpm: result.bpm, stars: result.stars, passed: result.passed))
         progress.update(lesson.id) { record in
             record.stepStars[index] = max(record.stepStars[index] ?? 0, result.stars)
             if result.passed, let bpm = result.bpm {
