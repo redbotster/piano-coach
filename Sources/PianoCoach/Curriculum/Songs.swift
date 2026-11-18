@@ -28,7 +28,7 @@ struct Song {
 extension Curriculum {
     static var songs: CurriculumSection {
         CurriculumSection(id: "songs", title: "Songs", symbol: "music.quarternote.3",
-                          units: [sFirst, sMoreFirst, sFolk, sClassics, sStage, sModern])
+                          units: [sFirst, sMoreFirst, sChristmas, sFolk, sClassics, sStudies, sStage, sModern])
     }
 
     // MARK: - Helpers

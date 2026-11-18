@@ -10,7 +10,7 @@ It was built for the 61-key **Novation Launchkey 61**, and works with any MIDI k
 
 - **Shows the full 61-key keyboard** (C2–C7) and lights the keys for each step: blue for the right hand, orange for the left, with finger numbers on the keys.
 - **Listens over MIDI** and marks each note green or red as you play.
-- **Walks you through 267 lessons** that mix short explanations, a Listen/Demo button, and scored playing tasks.
+- **Walks you through 287 lessons** that mix short explanations, a Listen/Demo button, and scored playing tasks.
 - **Plans your practice**: a Today screen builds a 15–20 minute session from a warm-up, lessons due for review (spaced repetition), and what's next.
 - **Scores what a teacher would listen for:**
   - note accuracy and wrong notes
@@ -126,7 +126,7 @@ Mouse and typed notes use a fixed velocity, so tasks that score dynamics or acce
 
 ## Curriculum
 
-267 lessons in six sections.
+287 lessons in six sections.
 
 ### 1. Foundations (19 lessons)
 
@@ -200,14 +200,16 @@ Mouse and typed notes use a fixed velocity, so tasks that score dynamics or acce
 
 The app plays the prompt, hides the key lights, and you play back what you heard.
 
-### 6. Songs (52 lessons)
+### 6. Songs (72 lessons)
 
 | Unit | Lessons | Includes |
 |---|---|---|
 | First songs | 8 | Ode to Joy, Twinkle Twinkle, Frère Jacques, Jingle Bells, When the Saints |
 | More first songs | 13 | Hot Cross Buns, Mary Had a Little Lamb, Lightly Row, Au clair de la lune, Old MacDonald, Oh! Susanna, Row Row Row Your Boat, Good King Wenceslas |
+| Christmas songs | 12 | Angels We Have Heard on High, Away in a Manger, We Wish You a Merry Christmas, O Christmas Tree, Joy to the World, Deck the Halls, The First Noel, Hark! The Herald Angels Sing, God Rest Ye Merry Gentlemen, O Come All Ye Faithful, Ding Dong! Merrily on High, What Child Is This? |
 | Folk and traditional | 6 | Happy Birthday, Amazing Grace, Auld Lang Syne, Silent Night |
 | Classics | 14 | Minuet in G, Canon in D, Für Elise, Prelude in C, Gymnopédie No. 1, Moonlight Sonata, Rondo alla Turca |
+| Technique builders | 8 | Hanon Nos. 1–4, Clementi Sonatina Op. 36 No. 1, Burgmüller Arabesque, Rondo alla Turca, Bach Invention No. 1 (openings) |
 | Stage and screen | 5 | Can-Can, Toreador Song, Swan Lake, Daisy Bell, Take Me Out to the Ball Game |
 | Getting ready for modern musicals | 6 | original exercises: four-chord vamps, syncopated comping, ballad arpeggios, dramatic minor, power-ballad build, sus and slash chords |
 
