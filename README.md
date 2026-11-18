@@ -10,7 +10,8 @@ It was built for the 61-key **Novation Launchkey 61**, and works with any MIDI k
 
 - **Shows the full 61-key keyboard** (C2–C7) and lights the keys for each step: blue for the right hand, orange for the left, with finger numbers on the keys.
 - **Listens over MIDI** and marks each note green or red as you play.
-- **Walks you through 287 lessons** that mix short explanations, a Listen/Demo button, and scored playing tasks.
+- **Walks you through 330 lessons** that mix short explanations, a Listen/Demo button, and scored playing tasks.
+- **Teaches singing too**: a Voice section listens through the microphone, draws the pitch of your voice against the notes to sing, and scores how in tune you are. A Voice studio adds a live tuner, recording and Auto-Tune.
 - **Plans your practice**: a Today screen builds a 15–20 minute session from a warm-up, lessons due for review (spaced repetition), and what's next.
 - **Scores what a teacher would listen for:**
   - note accuracy and wrong notes
@@ -85,9 +86,18 @@ Choose **Import a song…** in the sidebar (⌘I) and pick a MIDI (`.mid`) or Mu
 
 This is how to learn music that can't ship with the app. Songs from shows such as *The Phantom of the Opera* and *Rent* are under copyright, so they are not built in; import an arrangement you own instead. Imported songs stay on your Mac.
 
+### Singing
+
+The **Voice** section and the **Voice studio** (both in the sidebar) use the Mac's microphone. macOS asks for permission the first time; the microphone is on only while a singing step or the studio is showing, and audio never leaves the Mac.
+
+- **Pitch display:** your voice is drawn as a line over the target notes — green when in tune (within 50 cents), orange when not — and the note you are singing lights up on the keyboard.
+- **Your range:** the first Voice lesson measures your lowest and highest comfortable notes, and every exercise is then moved into that range. You can also pick Low, Medium-low, Medium-high or High from the Voice menu under any exercise. The right note counts in any octave.
+- **Headphones switch:** with headphones on, the piano plays along as a guide and the metronome keeps going. Without them the app plays your starting note and a count-in, then stays silent so the microphone hears only you.
+- **Voice studio:** a live tuner, plus Auto-Tune for fun. Record a take (up to 90 seconds) and play it back as sung or pulled onto the notes of a key and scale (Natural, Strong or Robot), and save it as a WAV file. With headphones you can also hear yourself live, plain or Auto-Tuned.
+
 ### Profiles
 
-The person menu in the toolbar switches between profiles and adds, renames or deletes them. Each profile has its own progress, stars, history and daily plan. Imported songs and settings are shared.
+The person menu in the toolbar switches between profiles and adds, renames or deletes them. Each profile has its own progress, stars, history, daily plan and voice range. Imported songs and settings are shared.
 
 ### No keyboard handy?
 
@@ -126,7 +136,7 @@ Mouse and typed notes use a fixed velocity, so tasks that score dynamics or acce
 
 ## Curriculum
 
-287 lessons in six sections.
+330 lessons in seven sections.
 
 ### 1. Foundations (19 lessons)
 
@@ -215,7 +225,23 @@ The app plays the prompt, hides the key lights, and you play back what you heard
 
 Every built-in piece is in the public domain, mostly as excerpts in simple arrangements. Each lesson goes right hand, left hand, hands together slowly, then performance tempo.
 
+### 7. Voice (43 lessons)
+
+| Unit | Lessons | Includes |
+|---|---|---|
+| Getting started | 5 | microphone and headphones, vocal health, posture, find your range, in tune / flat / sharp, first timed exercises |
+| Breath and support | 5 | low breathing, the steady hiss, long tones, sirens and lip trills, clean note starts |
+| Matching pitch | 5 | single notes, neighbour notes, sliding to a note, three-note shapes, hear-then-sing from memory |
+| Scales and solfège | 6 | do-re-mi, five-note scale, major scale, natural minor, scale in thirds, review |
+| Intervals | 6 | seconds to the octave from do, half steps and minor thirds, major and minor arpeggios, mixed review |
+| Warm-ups and agility | 6 | rising five-note and arpeggio warm-ups, vowels, staccato, fast runs, a daily warm-up routine |
+| Songs to sing | 10 | Mary Had a Little Lamb, Twinkle Twinkle, Frère Jacques, London Bridge, Row Row Row Your Boat, Ode to Joy, Happy Birthday, Amazing Grace, Auld Lang Syne, Silent Night |
+
+Songs have the words on the notes.
+
 ## Limitations
+
+- **The voice mode has not been tried with a real microphone.** Pitch detection, scoring and Auto-Tune pass tests on synthesised tones, but live input, the feel of the display, live monitoring and how Auto-Tune sounds on a real voice are untested. Only pitch is scored: breath, tone and diction are taught with self-check lists.
 
 - **MIDI can't see your body.** Posture, hand shape and relaxation are taught with self-check lists and links to video searches, not verified.
 - **Some notation is simplified.** Accidentals are printed on every altered note, clef changes are shown by moving between staves, and the segno and coda are text labels.
@@ -232,7 +258,8 @@ Every built-in piece is in the public domain, mostly as excerpts in simple arran
 swift build                                     # debug build
 .build/debug/PianoCoach                         # run without packaging
 .build/debug/PianoCoach --check -v              # validate every lesson
-.build/debug/PianoCoach --selftest              # engine, import, plan and profile tests
+.build/debug/PianoCoach --selftest              # engine, import, plan, profile, pitch and singing tests
+.build/debug/PianoCoach --voice-probe           # open the microphone for 2 s and report what it hears
 .build/debug/PianoCoach --snapshot out/ <id>    # render a lesson's steps to PNG
 .build/debug/PianoCoach --import-info <files>   # show how MIDI / MusicXML files would import
 .build/debug/PianoCoach --import <files>        # add files to My Songs from the command line (restart the app to see them)
@@ -245,8 +272,9 @@ scripts/build-app.sh                            # release build + .app bundle
 Sources/PianoCoach/
   Core/        music theory, lesson model, lesson DSL
   Engine/      CoreMIDI input, piano sound and metronome, scoring, practice plan,
-               history, profiles, song import, app state
-  Views/       keyboard, staff, rhythm lane, lesson screens
+               history, profiles, song import, microphone pitch tracking and Auto-Tune,
+               singing scorer, app state
+  Views/       keyboard, staff, rhythm lane, pitch display, lesson screens
   Curriculum/  the lessons
 ```
 

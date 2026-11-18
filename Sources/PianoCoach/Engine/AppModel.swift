@@ -77,6 +77,32 @@ final class AppModel: ObservableObject {
     static let todayID = "@today"
     static let progressID = "@progress"
     static let freePlayID = "@free"
+    static let voiceID = "@voice"
+    /// Set when rendering snapshots, so the microphone is never opened.
+    static var headless = false
+
+    // Voice
+    let voice = VoiceEngine()
+    @Published var singRunner: SingRunner?
+    /// The key nearest to the note being sung, shown on the keyboard.
+    @Published private(set) var sungKey: Int?
+    /// With headphones the piano can guide the singer without the microphone hearing it.
+    @Published var headphones: Bool {
+        didSet {
+            UserDefaults.standard.set(headphones, forKey: "voiceHeadphones")
+            if !headphones { voice.monitor = .off }
+            if oldValue != headphones { rebuildSingRunner() }
+        }
+    }
+    @Published var voiceRange: VoiceRange {
+        didSet {
+            if let data = try? JSONEncoder().encode(voiceRange) {
+                UserDefaults.standard.set(data, forKey: "voiceRange." + profiles.currentID)
+            }
+        }
+    }
+    private var singSink: AnyCancellable?
+    private var voiceSink: AnyCancellable?
 
     // Navigation
     @Published var selectedLessonID: String? { didSet { if oldValue != selectedLessonID { openLesson() } } }
@@ -166,6 +192,8 @@ final class AppModel: ObservableObject {
         padLights = defaults.bool(forKey: "padLights")
         fallingNotes = defaults.object(forKey: "fallingNotes") as? Bool ?? true
         soundFontPath = defaults.string(forKey: "soundFontPath")
+        headphones = defaults.bool(forKey: "voiceHeadphones")
+        voiceRange = Self.storedVoiceRange(profiles.currentID)
         if let path = soundFontPath, !audio.loadInstrument(from: URL(fileURLWithPath: path)) { soundFontPath = nil }
 
         rebuildIndex()
@@ -181,6 +209,11 @@ final class AppModel: ObservableObject {
             }
         }
         if padLights { midi.setPadLights(enabled: true) }
+        voice.output = audio
+        voice.onFrame = { [weak self] frame in self?.handleVoice(frame) }
+        voiceSink = voice.objectWillChange.sink { [weak self] in
+            DispatchQueue.main.async { self?.objectWillChange.send() }
+        }
         installTypingKeyboard()
         selectedLessonID = defaults.string(forKey: "lastLesson").flatMap { lessonIndex[$0] != nil ? $0 : nil } ?? Self.todayID
         openLesson()
@@ -291,6 +324,7 @@ final class AppModel: ObservableObject {
         history = HistoryStore(url: profiles.historyURL)
         PracticePlan.profileKey = "." + profiles.currentID
         tempoOverride = [:]
+        voiceRange = Self.storedVoiceRange(profiles.currentID)
         selectedLessonID = Self.todayID
         objectWillChange.send()
     }
@@ -377,6 +411,65 @@ final class AppModel: ObservableObject {
         prepareStep()
     }
 
+    // MARK: Voice
+
+    private static func storedVoiceRange(_ profile: String) -> VoiceRange {
+        if let data = UserDefaults.standard.data(forKey: "voiceRange." + profile),
+           let range = try? JSONDecoder().decode(VoiceRange.self, from: data) { return range }
+        return .standard
+    }
+
+    /// The microphone is on only while a singing step or the voice studio is showing.
+    private func updateVoice() {
+        var wanted = selectedLessonID == Self.voiceID
+        if case .sing = step, !lessonFinished { wanted = true }
+        if wanted {
+            if !Self.headless { voice.start() }
+        } else {
+            voice.monitor = .off
+            voice.stop()
+            if sungKey != nil { sungKey = nil }
+        }
+    }
+
+    private func attachSing(_ task: SingTask) {
+        singRunner?.stop()
+        let runner = SingRunner(task: task, range: voiceRange, headphones: headphones)
+        runner.audio = audio
+        runner.onFinish = { [weak self] result in self?.singFinished(result) }
+        runner.onRange = { [weak self] range in self?.voiceRange = range }
+        singSink = runner.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
+        singRunner = runner
+        lastResult = nil
+    }
+
+    /// Start the current singing step again with the present range and headphone settings.
+    func rebuildSingRunner() {
+        guard case .sing(let task) = step, !lessonFinished, let runner = singRunner,
+              runner.phase == .ready || runner.phase == .done || !runner.isTimed else { return }
+        attachSing(task)
+    }
+
+    func setVoiceRange(_ range: VoiceRange) {
+        voiceRange = range
+        rebuildSingRunner()
+    }
+
+    private func singFinished(_ result: TaskResult) {
+        lastResult = result
+        guard let lesson else { return }
+        let index = stepIndex
+        history.record(Attempt(date: Date(), lessonID: lesson.id, step: index, accuracy: result.accuracy,
+                               timingMs: nil, evenness: nil, bpm: nil, stars: result.stars, passed: result.passed))
+        progress.update(lesson.id) { $0.stepStars[index] = max($0.stepStars[index] ?? 0, result.stars) }
+    }
+
+    private func handleVoice(_ frame: PitchFrame) {
+        singRunner?.ingest(frame)
+        let key = frame.midi.map { Int($0.rounded()) }.flatMap { (Music.lowestKey...Music.highestKey).contains($0) ? $0 : nil }
+        if key != sungKey { sungKey = key }
+    }
+
     func goToStep(_ i: Int) {
         guard let lesson, lesson.steps.indices.contains(i) else { return }
         stepIndex = i
@@ -418,6 +511,7 @@ final class AppModel: ObservableObject {
             }
         }
         lessonFinished = true
+        updateVoice()
     }
 
     private func clearStepState() {
@@ -426,6 +520,9 @@ final class AppModel: ObservableObject {
         runner?.stop()
         runner = nil
         runnerSink = nil
+        singRunner?.stop()
+        singRunner = nil
+        singSink = nil
         lastResult = nil
         checked = []
         quizDone = false
@@ -442,8 +539,14 @@ final class AppModel: ObservableObject {
         switch step {
         case .play(let task): attach(task)
         case .quiz(let quiz): attach(quiz.make(0))
+        case .sing(let task): attachSing(task)
         default: break
         }
+        if selectedLessonID == Self.voiceID {
+            // The voice studio draws free singing with no targets and never finishes.
+            attachSing(SingTask(title: "Voice studio", instructions: "", kind: .free(seconds: .infinity, span: .infinity)))
+        }
+        updateVoice()
     }
 
     private func tempoKey() -> String { "\(selectedLessonID ?? "")#\(stepIndex)" }
@@ -806,6 +909,10 @@ final class AppModel: ObservableObject {
             if event.type == .keyDown, !event.isARepeat {
                 if event.keyCode == 6 { self.typingOctave = max(2, self.typingOctave - 1); return nil }   // Z
                 if event.keyCode == 7 { self.typingOctave = min(6, self.typingOctave + 1); return nil }   // X
+                if event.keyCode == 49, let sing = self.singRunner, sing.isTimed, sing.phase == .ready || sing.phase == .done {
+                    sing.begin()
+                    return nil
+                }
                 if event.keyCode == 49, self.calibration == nil, let runner = self.runner, runner.timedRun,
                    runner.phase == .ready || runner.phase == .done {                                     // space
                     self.startTask()
@@ -843,6 +950,17 @@ final class AppModel: ObservableObject {
                 marks[spec.midi] = KeyMark(kind: .target, hand: spec.hand,
                                            finger: runner.task.showFingers ? spec.finger : nil)
             }
+        }
+        if let runner = singRunner, !lessonFinished, runner.phase != .done, runner.index < runner.targets.count,
+           let target = runner.targets[runner.index].midi, (Music.lowestKey...Music.highestKey).contains(target) {
+            marks[target] = KeyMark(kind: .target, label: Music.name(target))
+        }
+        if let key = sungKey {
+            var good = false
+            if let runner = singRunner, runner.index < runner.targets.count, let target = runner.targets[runner.index].midi {
+                good = (key - target) % 12 == 0
+            }
+            marks[key] = KeyMark(kind: good ? .good : .info, label: Music.name(key))
         }
         // Playing along with the demo: a lit key turns green while it is held.
         for note in demoNotes { marks[note] = KeyMark(kind: pressed[note] != nil ? .good : .demo) }

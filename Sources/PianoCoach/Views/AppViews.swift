@@ -16,6 +16,8 @@ struct ContentView: View {
                         ProgressDashboard()
                     } else if app.selectedLessonID == AppModel.freePlayID {
                         FreePlayView()
+                    } else if app.selectedLessonID == AppModel.voiceID {
+                        VoiceStudioView(voice: app.voice)
                     } else {
                         TodayView()
                     }
@@ -125,9 +127,10 @@ struct SidebarView: View {
     var body: some View {
         List(selection: $app.selectedLessonID) {
             Section {
-                Label("Today", systemImage: "sun.max").tag(Optional(AppModel.todayID))
-                Label("Progress", systemImage: "chart.line.uptrend.xyaxis").tag(Optional(AppModel.progressID))
-                Label("Free play", systemImage: "pianokeys").tag(Optional(AppModel.freePlayID))
+                SidebarLink(title: "Today", symbol: "sun.max", id: AppModel.todayID)
+                SidebarLink(title: "Progress", symbol: "chart.line.uptrend.xyaxis", id: AppModel.progressID)
+                SidebarLink(title: "Free play", symbol: "pianokeys", id: AppModel.freePlayID)
+                SidebarLink(title: "Voice studio", symbol: "music.mic", id: AppModel.voiceID)
                 Button {
                     app.importSong()
                 } label: { Label("Import a song…", systemImage: "square.and.arrow.down") }
@@ -183,6 +186,32 @@ struct SidebarView: View {
     private func binding(_ id: String) -> Binding<Bool> {
         Binding(get: { expanded.contains(id) },
                 set: { open in if open { expanded.insert(id) } else { expanded.remove(id) } })
+    }
+}
+
+/// A top-of-sidebar destination. The list's own selection ignores these rows, so each one is a button.
+struct SidebarLink: View {
+    @EnvironmentObject var app: AppModel
+    let title: String
+    let symbol: String
+    let id: String
+
+    var body: some View {
+        let selected = app.selectedLessonID == id
+        Button {
+            app.selectedLessonID = id
+        } label: {
+            Label(title, systemImage: symbol)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(selected ? Color.accentColor.opacity(0.25) : Color.clear)
+                .padding(.horizontal, 10)
+        )
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

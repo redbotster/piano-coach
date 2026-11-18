@@ -1,3 +1,4 @@
+import AVFoundation
 import AppKit
 import SwiftUI
 
@@ -66,7 +67,9 @@ enum Main {
             let plan = PracticePlan.selfTest()
             let profiles = ProfileStore.selfTest()
             let sequencer = NoteSequencer.selfTest()
-            exit(engine && importer && plan && profiles && sequencer ? 0 : 1)
+            let voice = VoiceEngine.selfTest()
+            let singing = SingRunner.selfTest()
+            exit(engine && importer && plan && profiles && sequencer && voice && singing ? 0 : 1)
         }
         if let i = args.firstIndex(of: "--import-info"), args.count > i + 1 {
             for path in args[(i + 1)...] { print(SongImport.debugSummary(of: URL(fileURLWithPath: path))) }
@@ -91,6 +94,27 @@ enum Main {
                 }
             }
             exit(failed ? 1 : 0)
+        }
+        if args.contains("--voice-probe") {
+            // Opens the microphone for two seconds and reports what it hears (only if access was already granted).
+            let status = AVCaptureDevice.authorizationStatus(for: .audio)
+            print("microphone access: \(status == .authorized ? "granted" : status == .notDetermined ? "not asked yet" : "denied")")
+            guard status == .authorized else { exit(2) }
+            let voice = VoiceEngine()
+            var frames = 0, voiced = 0, peak = 0.0
+            voice.onFrame = { frame in
+                frames += 1
+                if frame.midi != nil { voiced += 1 }
+                peak = max(peak, frame.level)
+            }
+            voice.start()
+            RunLoop.main.run(until: Date().addingTimeInterval(2))
+            print("state: \(voice.state), live monitoring available: \(voice.canMonitor)")
+            print("readings: \(frames), with a pitch: \(voiced), peak level: \(String(format: "%.3f", peak))")
+            voice.monitor = .tuned
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+            voice.stop()
+            exit(voice.state == .off && frames > 0 ? 0 : 1)
         }
         if let i = args.firstIndex(of: "--icon"), args.count > i + 1 {
             MainActor.assumeIsolated { Snapshot.renderIcon(to: args[i + 1]) }

@@ -2,7 +2,7 @@ import Foundation
 
 /// The whole course. Each section lives in its own file as an extension.
 enum Curriculum {
-    static let sections: [CurriculumSection] = [foundations, rhythm, reading, technique, earTraining, songs]
+    static let sections: [CurriculumSection] = [foundations, rhythm, reading, technique, earTraining, songs, voice]
 
     static func lesson(_ id: String, _ title: String, _ summary: String, _ steps: [Step]) -> Lesson {
         Lesson(id: id, title: title, summary: summary, steps: steps)
@@ -69,6 +69,18 @@ enum Curriculum {
                         case .quiz(let quiz):
                             if quiz.rounds < 1 { problems.append("\(place): quiz without rounds") }
                             for round in 0..<min(quiz.rounds, 40) { check(quiz.make(round), place + " round \(round)") }
+                        case .sing(let task):
+                            tasks += 1
+                            let notes = task.expanded
+                            switch task.kind {
+                            case .match, .timed:
+                                if notes.compactMap({ $0.semitone }).isEmpty { problems.append("\(place): sing task '\(task.title)' has no notes") }
+                                if notes.contains(where: { $0.beats <= 0 }) { problems.append("\(place): sing task '\(task.title)' has a zero-length note") }
+                                if task.span.upperBound - task.span.lowerBound > 19 { problems.append("\(place): sing task '\(task.title)' spans more than an octave and a fifth") }
+                                if case .timed(let bpm) = task.kind, bpm < 30 || bpm > 200 { problems.append("\(place): sing task '\(task.title)' bpm \(bpm)") }
+                            case .free, .range:
+                                break
+                            }
                         }
                     }
                     if verbose { print("  \(lesson.id): \(lesson.title) — \(lesson.steps.count) steps") }

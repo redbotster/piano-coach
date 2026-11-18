@@ -6,6 +6,8 @@ final class AudioEngine {
     private let engine = AVAudioEngine()
     private let piano = AVAudioUnitSampler()
     private let clicker = AVAudioPlayerNode()
+    private let samplePlayer = AVAudioPlayerNode()
+    private var sampleToken = 0
     private let clickFormat = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
     private var accentClick: AVAudioPCMBuffer!
     private var normalClick: AVAudioPCMBuffer!
@@ -19,6 +21,7 @@ final class AudioEngine {
         normalClick = makeClick(frequency: 1100, length: 0.035)
         engine.attach(piano)
         engine.attach(clicker)
+        engine.attach(samplePlayer)
         engine.connect(piano, to: engine.mainMixerNode, format: nil)
         engine.connect(clicker, to: engine.mainMixerNode, format: clickFormat)
         do {
@@ -93,6 +96,34 @@ final class AudioEngine {
             let when = AVAudioTime(hostTime: HostClock.ticks(click.time))
             clicker.scheduleBuffer(click.accent ? accentClick : normalClick, at: when, options: [], completionHandler: nil)
         }
+    }
+
+    /// Play a mono recording (for example a sung take) through the app's output.
+    func playSamples(_ samples: [Float], sampleRate: Double, completion: @escaping () -> Void) {
+        guard isRunning, !samples.isEmpty,
+              let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else {
+            completion()
+            return
+        }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        samples.withUnsafeBufferPointer { buffer.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }
+        samplePlayer.stop()
+        engine.connect(samplePlayer, to: engine.mainMixerNode, format: format)
+        sampleToken += 1
+        let token = sampleToken
+        samplePlayer.scheduleBuffer(buffer, at: nil, options: []) { [weak self] in
+            DispatchQueue.main.async {
+                guard let self, self.sampleToken == token else { return }
+                completion()
+            }
+        }
+        samplePlayer.play()
+    }
+
+    func stopSamples() {
+        sampleToken += 1
+        if isRunning, samplePlayer.engine != nil { samplePlayer.stop() }
     }
 
     func cancelClicks() {

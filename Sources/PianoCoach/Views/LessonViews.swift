@@ -126,6 +126,8 @@ struct LessonView: View {
             if let runner = app.runner { TaskView(runner: runner, task: runner.task, quiz: nil) }
         case .quiz(let quiz):
             if let runner = app.runner { TaskView(runner: runner, task: runner.task, quiz: quiz) }
+        case .sing:
+            if let runner = app.singRunner { SingTaskView(runner: runner) }
         }
     }
 

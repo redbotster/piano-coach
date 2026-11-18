@@ -40,6 +40,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Piano Coach listens to your voice to show its pitch in singing lessons and the voice studio. Audio stays on this Mac.</string>
   <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict>
 </plist>

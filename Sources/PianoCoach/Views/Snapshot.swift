@@ -14,6 +14,7 @@ enum Snapshot {
                     case .checklist(let list): ChecklistStepView(list: list)
                     case .play(let task): if let r = app.runner { TaskView(runner: r, task: task, quiz: nil) }
                     case .quiz(let quiz): if let r = app.runner { TaskView(runner: r, task: r.task, quiz: quiz) }
+                    case .sing: if let r = app.singRunner { SingTaskView(runner: r) }
                     }
                 }
                 if let runner = app.runner, runner.task.isTimed, runner.task.showTargets {
@@ -31,6 +32,7 @@ enum Snapshot {
     }
 
     static func render(to directory: String, lessonID: String?) {
+        AppModel.headless = true
         let app = AppModel()
         app.soundOn = false
         try? FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)

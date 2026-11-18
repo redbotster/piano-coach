@@ -27,6 +27,7 @@ enum Step {
     case checklist(ChecklistStep)
     case play(PlayTask)
     case quiz(QuizStep)
+    case sing(SingTask)
 
     var title: String {
         switch self {
@@ -34,12 +35,13 @@ enum Step {
         case .checklist(let s): return s.title
         case .play(let s): return s.title
         case .quiz(let s): return s.title
+        case .sing(let s): return s.title
         }
     }
 
     var isScored: Bool {
         switch self {
-        case .play, .quiz: return true
+        case .play, .quiz, .sing: return true
         default: return false
         }
     }
