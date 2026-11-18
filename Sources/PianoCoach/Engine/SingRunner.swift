@@ -41,6 +41,7 @@ final class SingRunner: ObservableObject {
     /// Free exploration: seconds sung and semitones covered so far.
     @Published private(set) var freeSeconds = 0.0
     @Published private(set) var freeSpan = 0.0
+    private var freeTime = 0.0
 
     private(set) var trace: [TracePoint] = []
     var audio: AudioEngine?
@@ -201,6 +202,7 @@ final class SingRunner: ObservableObject {
         held = 0
         heldProgress = 0
         freeSeconds = 0
+        freeTime = 0
         freeSpan = 0
         freeLow = .infinity
         freeHigh = -.infinity
@@ -234,6 +236,15 @@ final class SingRunner: ObservableObject {
         let work = DispatchWorkItem(block: block)
         pending.append(work)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    /// True while the display should scroll.
+    var isMoving: Bool { isTimed ? (phase == .countIn || phase == .running) : phase != .done }
+
+    /// Seconds on the exercise's own timeline, read straight from the clock for smooth drawing.
+    func displayTime() -> Double {
+        guard isMoving, !AppModel.headless else { return clock.beat }
+        return isTimed ? HostClock.now() - startTime : HostClock.now() - origin
     }
 
     // MARK: Following the voice
@@ -322,7 +333,9 @@ final class SingRunner: ObservableObject {
             } else if frame.time - lastGood > 0.2 {
                 held = 0
             }
-            heldProgress = min(1, held / hold)
+            // Published in steps, so the screen is not redrawn for every reading.
+            let progress = (min(1, held / hold) * 25).rounded() / 25
+            if progress != heldProgress { heldProgress = progress }
             if held >= hold {
                 statuses[index] = .correct
                 advance()
@@ -331,11 +344,15 @@ final class SingRunner: ObservableObject {
         case .free(let seconds, let span):
             guard let midi = frame.midi else { return }
             append(TracePoint(time: frame.time - origin, midi: midi, good: nil))
-            freeSeconds += dt
+            freeTime += dt
             freeLow = min(freeLow, midi)
             freeHigh = max(freeHigh, midi)
-            freeSpan = max(0, freeHigh - freeLow)
-            if freeSeconds >= seconds, freeSpan >= span {
+            // Published in steps, so the screen is not redrawn for every reading.
+            let shownSeconds = (freeTime * 4).rounded(.down) / 4
+            if shownSeconds != freeSeconds, seconds.isFinite { freeSeconds = shownSeconds }
+            let shownSpan = (max(0, freeHigh - freeLow) * 2).rounded(.down) / 2
+            if shownSpan != freeSpan, span.isFinite { freeSpan = shownSpan }
+            if freeTime >= seconds, max(0, freeHigh - freeLow) >= span {
                 finish(accuracy: 1, correct: 1, total: 1, detail: String(format: "You covered %.0f semitones.", freeSpan))
             }
 

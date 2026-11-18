@@ -285,6 +285,12 @@ final class VoiceEngine: ObservableObject {
     private var tuneState = AutoTune.State()
     private var attached = false
     private var monitorConnected = false
+    /// Receives the microphone in small blocks (about a hundredth of a second), so the display keeps up with the voice.
+    private var sink: AVAudioSinkNode?
+    private let captureQueue = DispatchQueue(label: "voice.capture", qos: .userInteractive)
+    private var blocksHeard = 0
+    private var meterTime = 0.0
+    private var usingTap = false
     private var sampleRate = 48000.0
 
     // Written on the audio thread, read on the main thread.
@@ -333,9 +339,24 @@ final class VoiceEngine: ObservableObject {
         }
         monitorMixer.outputVolume = 0
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, when in
-            self?.capture(buffer, when: when, tracker: tracker)
+        usingTap = false
+        lock.lock(); blocksHeard = 0; lock.unlock()
+        if let old = sink { engine.detach(old) }
+        let rate = sampleRate
+        let sink = AVAudioSinkNode { [weak self] timestamp, count, list -> OSStatus in
+            guard let self, count > 0, let data = list.pointee.mBuffers.mData else { return noErr }
+            let samples = Array(UnsafeBufferPointer(start: data.assumingMemoryBound(to: Float.self), count: Int(count)))
+            let stamp = timestamp.pointee
+            let start = stamp.mFlags.contains(.hostTimeValid) ? HostClock.seconds(stamp.mHostTime)
+                                                              : HostClock.now() - Double(count) / rate
+            self.captureQueue.async {
+                samples.withUnsafeBufferPointer { self.capture($0, start: start, tracker: tracker) }
+            }
+            return noErr
         }
+        self.sink = sink
+        engine.attach(sink)
+        engine.connect(input, to: sink, format: format)
         // Lessons only listen. The path that plays the voice back out is added when monitoring is switched on.
         monitorConnected = false
         canMonitor = true
@@ -343,12 +364,38 @@ final class VoiceEngine: ObservableObject {
         do {
             try engine.start()
         } catch {
-            input.removeTap(onBus: 0)
-            state = .failed("The microphone could not be started: \(error.localizedDescription)")
-            return
+            // Fall back to a plain tap, which delivers larger blocks.
+            engine.detach(sink)
+            self.sink = nil
+            installTap(tracker)
+            do {
+                try engine.start()
+            } catch {
+                input.removeTap(onBus: 0)
+                state = .failed("The microphone could not be started: \(error.localizedDescription)")
+                return
+            }
         }
         state = .running
         applyMonitor()
+        // If the small-block path stays silent, switch to the tap.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self, self.isRunning, self.tracker === tracker, !self.usingTap else { return }
+            self.lock.lock(); let heard = self.blocksHeard; self.lock.unlock()
+            if heard == 0 { self.installTap(tracker) }
+        }
+    }
+
+    private func installTap(_ tracker: PitchTracker) {
+        let input = engine.inputNode
+        usingTap = true
+        input.removeTap(onBus: 0)
+        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { [weak self] buffer, when in
+            guard let self, let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
+            let start = when.isHostTimeValid ? HostClock.seconds(when.hostTime)
+                                             : HostClock.now() - Double(buffer.frameLength) / self.sampleRate
+            self.capture(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)), start: start, tracker: tracker)
+        }
     }
 
     /// Join microphone → pitch shifter → output. Some device pairs cannot be joined; then monitoring is unavailable.
@@ -356,7 +403,12 @@ final class VoiceEngine: ObservableObject {
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         engine.stop()
-        engine.connect(input, to: shifter, format: format)
+        if let sink {
+            engine.connect(input, to: [AVAudioConnectionPoint(node: sink, bus: 0), AVAudioConnectionPoint(node: shifter, bus: 0)],
+                           fromBus: 0, format: format)
+        } else {
+            engine.connect(input, to: shifter, format: format)
+        }
         engine.connect(shifter, to: monitorMixer, format: format)
         engine.connect(monitorMixer, to: engine.mainMixerNode, format: format)
         do {
@@ -367,6 +419,7 @@ final class VoiceEngine: ObservableObject {
             engine.disconnectNodeOutput(input)
             engine.disconnectNodeOutput(shifter)
             engine.disconnectNodeOutput(monitorMixer)
+            if let sink { engine.connect(input, to: sink, format: format) }
             canMonitor = false
             try? engine.start()
             if !engine.isRunning { state = .failed("The microphone stopped: \(error.localizedDescription)") }
@@ -382,10 +435,14 @@ final class VoiceEngine: ObservableObject {
             engine.stop()
         }
         if monitorConnected {
-            engine.disconnectNodeOutput(engine.inputNode)
             engine.disconnectNodeOutput(shifter)
             engine.disconnectNodeOutput(monitorMixer)
             monitorConnected = false
+        }
+        engine.disconnectNodeOutput(engine.inputNode)
+        if let sink {
+            engine.detach(sink)
+            self.sink = nil
         }
         tracker = nil
         meter.frame = .silent
@@ -404,13 +461,10 @@ final class VoiceEngine: ObservableObject {
         }
     }
 
-    private func capture(_ buffer: AVAudioPCMBuffer, when: AVAudioTime, tracker: PitchTracker) {
-        guard let channel = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
-        let samples = UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))
-        let start = when.isHostTimeValid ? HostClock.seconds(when.hostTime)
-                                         : HostClock.now() - Double(buffer.frameLength) / sampleRate
+    private func capture(_ samples: UnsafeBufferPointer<Float>, start: Double, tracker: PitchTracker) {
         let frames = tracker.process(samples, startTime: start)
         lock.lock()
+        blocksHeard += 1
         if recording != nil {
             if recording!.isEmpty { recordStart = start }
             recording!.append(contentsOf: samples)
@@ -418,15 +472,20 @@ final class VoiceEngine: ObservableObject {
         }
         let full = Double(recording?.count ?? 0) / sampleRate >= Self.maxTakeSeconds
         lock.unlock()
+        guard !frames.isEmpty || full else { return }
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.isRunning else { return }
+            guard let self, self.isRunning, self.tracker === tracker else { return }
             for frame in frames {
                 if self.monitor == .tuned {
                     self.shifter.pitch = Float(self.tune.correction(frame.midi, state: &self.tuneState))
                 }
                 self.onFrame?(frame)
             }
-            if let last = frames.last { self.meter.frame = last }
+            // The read-out is refreshed about 25 times a second; more is not visible and costs drawing time.
+            if let last = frames.last, last.time - self.meterTime >= 0.04 || (last.midi == nil) != (self.meter.frame.midi == nil) {
+                self.meterTime = last.time
+                self.meter.frame = last
+            }
             if full, self.isRecording { self.stopRecording() }
         }
     }

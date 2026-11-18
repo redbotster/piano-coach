@@ -5,104 +5,132 @@ import UniformTypeIdentifiers
 /// A scrolling piano roll of the voice: target notes as bars, the sung pitch as a line.
 struct PitchRollView: View {
     @ObservedObject var runner: SingRunner
-    @ObservedObject var clock: PlayheadClock
     /// Notes to show when the exercise has no targets of its own.
     var fallback: ClosedRange<Int>
 
     private let secondsVisible = 8.0
+    private let gutter: CGFloat = 34
+
+    private var range: ClosedRange<Int> {
+        runner.targets.contains { $0.midi != nil } ? runner.displayRange : fallback
+    }
 
     var body: some View {
-        Canvas { context, size in
-            let hasTargets = runner.targets.contains { $0.midi != nil }
-            let range = hasTargets ? runner.displayRange : fallback
-            let rows = range.count
-            let rowHeight = size.height / CGFloat(rows)
-            let gutter: CGFloat = 34
-            let now = clock.beat
-            let nowX = gutter + (size.width - gutter) * (runner.isTimed ? 0.3 : 0.82)
-            let perSecond = (size.width - gutter) / CGFloat(secondsVisible)
-            func y(_ midi: Double) -> CGFloat { size.height - CGFloat(midi - Double(range.lowerBound) + 0.5) * rowHeight }
-            func x(_ time: Double) -> CGFloat { nowX + CGFloat(time - now) * perSecond }
-
-            // Rows, shaded like the keyboard
-            for note in range {
-                let top = y(Double(note)) - rowHeight / 2
-                let rect = CGRect(x: 0, y: top, width: size.width, height: rowHeight)
-                if Music.isBlack(note) { context.fill(Path(rect), with: .color(Color.primary.opacity(0.055))) }
-                if Music.pc(note) == 0 {
-                    context.stroke(Path { $0.move(to: CGPoint(x: 0, y: top + rowHeight)); $0.addLine(to: CGPoint(x: size.width, y: top + rowHeight)) },
-                                   with: .color(Color.primary.opacity(0.18)), lineWidth: 1)
-                }
-                let showName = Music.pc(note) == 0 || (rowHeight >= 11 && !Music.isBlack(note))
-                if showName {
-                    context.draw(Text(Music.name(note)).font(.system(size: min(10, max(7, rowHeight * 0.8)), weight: Music.pc(note) == 0 ? .bold : .regular))
-                                    .foregroundColor(.secondary), at: CGPoint(x: gutter / 2, y: y(Double(note))))
-                }
-            }
-
-            // Target notes
-            let barHeight = max(8, rowHeight)
-            if runner.isTimed {
-                for (i, target) in runner.targets.enumerated() {
-                    guard let midi = target.midi else { continue }
-                    let left = x(target.start), right = x(target.start + target.length)
-                    guard right > gutter, left < size.width else { continue }
-                    let rect = CGRect(x: left + 1, y: y(Double(midi)) - barHeight / 2, width: max(4, right - left - 2), height: barHeight)
-                    let status = i < runner.statuses.count ? runner.statuses[i] : .pending
-                    let color: Color = status == .correct ? Palette.good : status == .pending ? Palette.right : Palette.bad
-                    let path = Path(roundedRect: rect, cornerRadius: min(5, barHeight / 2))
-                    context.fill(path, with: .color(color.opacity(status == .pending ? 0.55 : 0.35)))
-                    context.stroke(path, with: .color(color.opacity(0.9)), lineWidth: 1)
-                    if let label = target.label, rect.width > 16 {
-                        context.draw(Text(label).font(.system(size: 11, weight: .semibold)).foregroundColor(.primary),
-                                     at: CGPoint(x: rect.minX + 5, y: rect.minY - 8), anchor: .leading)
+        let range = range
+        ZStack {
+            // Rows and note names never move, so they are drawn once, not on every frame.
+            Canvas { context, size in
+                let rowHeight = size.height / CGFloat(range.count)
+                func y(_ midi: Double) -> CGFloat { size.height - CGFloat(midi - Double(range.lowerBound) + 0.5) * rowHeight }
+                for note in range {
+                    let top = y(Double(note)) - rowHeight / 2
+                    let rect = CGRect(x: 0, y: top, width: size.width, height: rowHeight)
+                    if Music.isBlack(note) { context.fill(Path(rect), with: .color(Color.primary.opacity(0.055))) }
+                    if Music.pc(note) == 0 {
+                        context.stroke(Path { $0.move(to: CGPoint(x: 0, y: top + rowHeight)); $0.addLine(to: CGPoint(x: size.width, y: top + rowHeight)) },
+                                       with: .color(Color.primary.opacity(0.18)), lineWidth: 1)
+                    }
+                    let showName = Music.pc(note) == 0 || (rowHeight >= 11 && !Music.isBlack(note))
+                    if showName {
+                        context.draw(Text(Music.name(note)).font(.system(size: min(10, max(7, rowHeight * 0.8)), weight: Music.pc(note) == 0 ? .bold : .regular))
+                                        .foregroundColor(.secondary), at: CGPoint(x: gutter / 2, y: y(Double(note))))
                     }
                 }
-            } else if runner.index < runner.targets.count, let midi = runner.targets[runner.index].midi, runner.phase != .done {
-                let rect = CGRect(x: gutter, y: y(Double(midi)) - barHeight / 2, width: size.width - gutter, height: barHeight)
-                context.fill(Path(roundedRect: rect, cornerRadius: 4), with: .color(Palette.right.opacity(0.28)))
-                context.stroke(Path(roundedRect: rect, cornerRadius: 4), with: .color(Palette.right.opacity(0.8)), lineWidth: 1)
-                let name = [runner.targets[runner.index].label, Music.name(midi)].compactMap { $0 }.joined(separator: " · ")
-                context.draw(Text(name).font(.system(size: 12, weight: .semibold)).foregroundColor(.primary),
-                             at: CGPoint(x: gutter + 8, y: rect.minY - 9), anchor: .leading)
+                context.stroke(Path { $0.move(to: CGPoint(x: gutter, y: 0)); $0.addLine(to: CGPoint(x: gutter, y: size.height)) },
+                               with: .color(Color.primary.opacity(0.15)), lineWidth: 1)
             }
-
-            // The voice
-            var previous: SingRunner.TracePoint?
-            let earliest = now - Double((nowX - gutter) / perSecond) - 0.2
-            for point in runner.trace where point.time >= earliest {
-                let position = CGPoint(x: x(point.time), y: y(point.midi))
-                let color: Color = point.good == true ? Palette.good : point.good == false ? Palette.left : Palette.either
-                if let last = previous, point.time - last.time < 0.07, abs(point.midi - last.midi) < 1.5 {
-                    context.stroke(Path { $0.move(to: CGPoint(x: x(last.time), y: y(last.midi))); $0.addLine(to: position) },
-                                   with: .color(color), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                } else {
-                    context.fill(Path(ellipseIn: CGRect(x: position.x - 2, y: position.y - 2, width: 4, height: 4)), with: .color(color))
+            // The moving part follows the display's own refresh, reading the time directly.
+            // Runs on every display frame. The frame's date is used in the drawing so each frame really redraws.
+            TimelineView(.animation) { timeline in
+                let tick = timeline.date.timeIntervalSinceReferenceDate
+                Canvas { context, size in
+                    draw(&context, size: size, range: range, now: runner.displayTime(), tick: tick)
                 }
-                previous = point
-            }
-            if let last = previous, now - last.time < 0.12 {
-                let position = CGPoint(x: x(last.time), y: y(last.midi))
-                context.fill(Path(ellipseIn: CGRect(x: position.x - 5, y: position.y - 5, width: 10, height: 10)), with: .color(.white))
-                context.stroke(Path(ellipseIn: CGRect(x: position.x - 5, y: position.y - 5, width: 10, height: 10)),
-                               with: .color(Color.primary.opacity(0.7)), lineWidth: 1.5)
-            }
-
-            // "Now"
-            context.stroke(Path { $0.move(to: CGPoint(x: nowX, y: 0)); $0.addLine(to: CGPoint(x: nowX, y: size.height)) },
-                           with: .color(Color.primary.opacity(0.45)), lineWidth: 1.5)
-            context.stroke(Path { $0.move(to: CGPoint(x: gutter, y: 0)); $0.addLine(to: CGPoint(x: gutter, y: size.height)) },
-                           with: .color(Color.primary.opacity(0.15)), lineWidth: 1)
-
-            if runner.phase == .countIn {
-                let beat = 60 / runner.bpm
-                let count = max(1, Int((-now / beat).rounded(.up)))
-                context.draw(Text("\(count)").font(.system(size: 64, weight: .bold, design: .rounded)).foregroundColor(Palette.right.opacity(0.8)),
-                             at: CGPoint(x: gutter + (size.width - gutter) * 0.65, y: size.height / 2))
             }
         }
         .background(Color.primary.opacity(0.035))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func draw(_ context: inout GraphicsContext, size: CGSize, range: ClosedRange<Int>, now: Double, tick: Double) {
+        _ = tick
+        let rowHeight = size.height / CGFloat(range.count)
+        let nowX = gutter + (size.width - gutter) * (runner.isTimed ? 0.3 : 0.82)
+        let perSecond = (size.width - gutter) / CGFloat(secondsVisible)
+        func y(_ midi: Double) -> CGFloat { size.height - CGFloat(midi - Double(range.lowerBound) + 0.5) * rowHeight }
+        func x(_ time: Double) -> CGFloat { nowX + CGFloat(time - now) * perSecond }
+        context.clip(to: Path(CGRect(x: gutter, y: 0, width: size.width - gutter, height: size.height)))
+
+        // Target notes
+        let barHeight = max(8, rowHeight)
+        if runner.isTimed {
+            for (i, target) in runner.targets.enumerated() {
+                guard let midi = target.midi else { continue }
+                let left = x(target.start), right = x(target.start + target.length)
+                guard right > gutter, left < size.width else { continue }
+                let rect = CGRect(x: left + 1, y: y(Double(midi)) - barHeight / 2, width: max(4, right - left - 2), height: barHeight)
+                let status = i < runner.statuses.count ? runner.statuses[i] : .pending
+                let color: Color = status == .correct ? Palette.good : status == .pending ? Palette.right : Palette.bad
+                let path = Path(roundedRect: rect, cornerRadius: min(5, barHeight / 2))
+                context.fill(path, with: .color(color.opacity(status == .pending ? 0.55 : 0.35)))
+                context.stroke(path, with: .color(color.opacity(0.9)), lineWidth: 1)
+                if let label = target.label, rect.width > 16 {
+                    context.draw(Text(label).font(.system(size: 11, weight: .semibold)).foregroundColor(.primary),
+                                 at: CGPoint(x: rect.minX + 5, y: rect.minY - 8), anchor: .leading)
+                }
+            }
+        } else if runner.index < runner.targets.count, let midi = runner.targets[runner.index].midi, runner.phase != .done {
+            let rect = CGRect(x: gutter, y: y(Double(midi)) - barHeight / 2, width: size.width - gutter, height: barHeight)
+            context.fill(Path(roundedRect: rect, cornerRadius: 4), with: .color(Palette.right.opacity(0.28)))
+            context.stroke(Path(roundedRect: rect, cornerRadius: 4), with: .color(Palette.right.opacity(0.8)), lineWidth: 1)
+            let name = [runner.targets[runner.index].label, Music.name(midi)].compactMap { $0 }.joined(separator: " · ")
+            context.draw(Text(name).font(.system(size: 12, weight: .semibold)).foregroundColor(.primary),
+                         at: CGPoint(x: gutter + 8, y: rect.minY - 9), anchor: .leading)
+        }
+
+        // The voice: one path per colour, so a long line costs three strokes, not hundreds.
+        let trace = runner.trace
+        let earliest = now - Double((nowX - gutter) / perSecond) - 0.2
+        var low = 0, high = trace.count
+        while low < high {
+            let mid = (low + high) / 2
+            if trace[mid].time < earliest { low = mid + 1 } else { high = mid }
+        }
+        var lines = [Path(), Path(), Path()]
+        var dots = [Path(), Path(), Path()]
+        var previous: SingRunner.TracePoint?
+        for point in trace[low...] {
+            let position = CGPoint(x: x(point.time), y: y(point.midi))
+            let kind = point.good == true ? 0 : point.good == false ? 1 : 2
+            if let last = previous, point.time - last.time < 0.07, abs(point.midi - last.midi) < 1.5 {
+                lines[kind].move(to: CGPoint(x: x(last.time), y: y(last.midi)))
+                lines[kind].addLine(to: position)
+            } else {
+                dots[kind].addEllipse(in: CGRect(x: position.x - 2, y: position.y - 2, width: 4, height: 4))
+            }
+            previous = point
+        }
+        let colors = [Palette.good, Palette.left, Palette.either]
+        for kind in 0..<3 {
+            context.stroke(lines[kind], with: .color(colors[kind]), style: StrokeStyle(lineWidth: 3.5, lineCap: .round, lineJoin: .round))
+            context.fill(dots[kind], with: .color(colors[kind]))
+        }
+        if let last = previous, now - last.time < 0.15 {
+            let circle = Path(ellipseIn: CGRect(x: x(last.time) - 5, y: y(last.midi) - 5, width: 10, height: 10))
+            context.fill(circle, with: .color(.white))
+            context.stroke(circle, with: .color(Color.primary.opacity(0.7)), lineWidth: 1.5)
+        }
+
+        // "Now"
+        context.stroke(Path { $0.move(to: CGPoint(x: nowX, y: 0)); $0.addLine(to: CGPoint(x: nowX, y: size.height)) },
+                       with: .color(Color.primary.opacity(0.45)), lineWidth: 1.5)
+
+        if runner.phase == .countIn {
+            let beat = 60 / runner.bpm
+            let count = max(1, Int((-now / beat).rounded(.up)))
+            context.draw(Text("\(count)").font(.system(size: 64, weight: .bold, design: .rounded)).foregroundColor(Palette.right.opacity(0.8)),
+                         at: CGPoint(x: gutter + (size.width - gutter) * 0.65, y: size.height / 2))
+        }
     }
 }
 
@@ -147,7 +175,12 @@ struct VoiceReadout: View {
             }
             .frame(maxWidth: 320)
             VStack(alignment: .leading, spacing: 4) {
-                ProgressView(value: min(1, frame.level)).frame(width: 90)
+                // Drawn by hand: the system progress bar is costly to update many times a second.
+                Capsule().fill(Color.primary.opacity(0.1))
+                    .frame(width: 90, height: 6)
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(Color.accentColor).frame(width: max(0, 90 * CGFloat(min(1, frame.level))), height: 6)
+                    }
                 Text("Level").font(.caption2).foregroundStyle(.secondary)
             }
         }
@@ -230,7 +263,7 @@ struct SingTaskView: View {
             RichText(text: task.instructions)
             MicStatusView(voice: app.voice)
 
-            PitchRollView(runner: runner, clock: runner.clock, fallback: fallbackRange)
+            PitchRollView(runner: runner, fallback: fallbackRange)
                 .frame(height: 280)
             VoiceReadout(meter: app.voice.meter)
 
@@ -374,7 +407,7 @@ struct VoiceStudioView: View {
                 MicStatusView(voice: voice)
 
                 if let runner = app.singRunner {
-                    PitchRollView(runner: runner, clock: runner.clock,
+                    PitchRollView(runner: runner,
                                   fallback: (app.voiceRange.low - 7)...(app.voiceRange.high + 7))
                         .frame(height: 300)
                 }

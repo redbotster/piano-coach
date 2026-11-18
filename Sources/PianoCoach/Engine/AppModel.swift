@@ -86,6 +86,8 @@ final class AppModel: ObservableObject {
     @Published var singRunner: SingRunner?
     /// The key nearest to the note being sung, shown on the keyboard.
     @Published private(set) var sungKey: Int?
+    private var sungCandidate: Int?
+    private var sungCandidateTime = 0.0
     /// With headphones the piano can guide the singer without the microphone hearing it.
     @Published var headphones: Bool {
         didSet {
@@ -467,7 +469,15 @@ final class AppModel: ObservableObject {
     private func handleVoice(_ frame: PitchFrame) {
         singRunner?.ingest(frame)
         let key = frame.midi.map { Int($0.rounded()) }.flatMap { (Music.lowestKey...Music.highestKey).contains($0) ? $0 : nil }
-        if key != sungKey { sungKey = key }
+        // The lit key changes only once a new note has settled, so passing wobbles do not redraw the window.
+        if key == sungKey {
+            sungCandidate = key
+        } else if key != sungCandidate {
+            sungCandidate = key
+            sungCandidateTime = frame.time
+        } else if frame.time - sungCandidateTime >= (key == nil ? 0.15 : 0.06) {
+            sungKey = key
+        }
     }
 
     func goToStep(_ i: Int) {
