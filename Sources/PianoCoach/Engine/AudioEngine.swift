@@ -8,6 +8,10 @@ final class AudioEngine {
     private let clicker = AVAudioPlayerNode()
     private let samplePlayer = AVAudioPlayerNode()
     private var sampleToken = 0
+    private let filePlayer = AVAudioPlayerNode()
+    private var filePlayerAttached = false
+    /// Loudness of an imported recording being sung along with.
+    var fileVolume: Float = 0.8 { didSet { if filePlayerAttached { filePlayer.volume = fileVolume } } }
     private let clickFormat = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
     private var accentClick: AVAudioPCMBuffer!
     private var normalClick: AVAudioPCMBuffer!
@@ -124,6 +128,29 @@ final class AudioEngine {
     func stopSamples() {
         sampleToken += 1
         if isRunning, samplePlayer.engine != nil { samplePlayer.stop() }
+    }
+
+    /// Play a sound file from `offset` seconds in, starting at `hostTime` (seconds on the `HostClock` timeline).
+    @discardableResult
+    func playFile(_ url: URL, from offset: Double, at hostTime: Double) -> Bool {
+        guard isRunning, let file = try? AVAudioFile(forReading: url) else { return false }
+        let format = file.processingFormat
+        let first = AVAudioFramePosition(max(0, offset) * format.sampleRate)
+        guard first < file.length else { return false }
+        if !filePlayerAttached {
+            engine.attach(filePlayer)
+            filePlayerAttached = true
+        }
+        filePlayer.stop()
+        engine.connect(filePlayer, to: engine.mainMixerNode, format: format)
+        filePlayer.volume = fileVolume
+        filePlayer.scheduleSegment(file, startingFrame: first, frameCount: AVAudioFrameCount(file.length - first), at: nil)
+        filePlayer.play(at: AVAudioTime(hostTime: HostClock.ticks(hostTime)))
+        return true
+    }
+
+    func stopFile() {
+        if isRunning, filePlayerAttached { filePlayer.stop() }
     }
 
     func cancelClicks() {

@@ -18,6 +18,14 @@ enum SingKind {
     case free(seconds: Double, span: Double)
     /// Finds the singer's lowest and highest comfortable notes.
     case range
+    /// Sing along with an imported recording; the notes come from analysing it.
+    case track
+}
+
+/// An imported recording and where its sound file is.
+struct TrackRef {
+    var track: VoiceTrack
+    var audio: URL
 }
 
 struct SingTask {
@@ -37,8 +45,16 @@ struct SingTask {
     var anyOctave: Bool = true
     /// Play the notes on the piano while singing (only when the singer wears headphones).
     var guide: Bool = true
+    /// The recording to sing with, for `.track`.
+    var track: TrackRef? = nil
 
-    var isTimed: Bool { if case .timed = kind { return true } else { return false } }
+    /// True when notes go by on a clock (a tempo or a recording).
+    var isTimed: Bool {
+        switch kind {
+        case .timed, .track: return true
+        default: return false
+        }
+    }
 
     /// The pattern with every repetition written out.
     var expanded: [SingNote] {

@@ -268,6 +268,7 @@ struct SingTaskView: View {
             VoiceReadout(meter: app.voice.meter)
 
             controls
+            if runner.isTrack { trackOptions }
             VoiceOptionsBar()
 
             if let result = runner.result {
@@ -280,6 +281,26 @@ struct SingTaskView: View {
                     guard let runner, runner.phase == .running, runner.index == 0 else { return }
                     runner.playReference()
                 }
+            }
+        }
+    }
+
+    /// Loudness of the recording, the piano guide, and a reminder about headphones.
+    private var trackOptions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 14) {
+                Label("Recording", systemImage: "speaker.wave.2").font(.callout)
+                Slider(value: $app.trackVolume, in: 0...1).frame(width: 160)
+                Toggle("Piano plays the notes too", isOn: $app.trackGuide)
+                    .disabled(!app.headphones)
+                    .help("Plays each detected note quietly on the piano as it goes by (headphones only)")
+                Spacer()
+            }
+            if !app.headphones {
+                Label("Without headphones the microphone hears the recording as well as you, so the pitch line and the score will be unreliable. Put headphones on and turn on the switch below.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout).foregroundStyle(Palette.left)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -312,6 +333,24 @@ struct SingTaskView: View {
                     Text(runner.phase == .countIn ? "Listen for your starting note…" : "Sing!")
                         .font(.callout).foregroundStyle(.secondary)
                 }
+            case .track:
+                if runner.phase == .ready || runner.phase == .done {
+                    Button {
+                        runner.begin()
+                    } label: { Label(runner.phase == .done ? "Sing again" : "Start", systemImage: "play.fill") }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!app.voice.isRunning || runner.isListening)
+                    Button {
+                        runner.isListening ? runner.reset() : runner.listen()
+                    } label: { Label(runner.isListening ? "Stop" : "Check the notes", systemImage: runner.isListening ? "stop.fill" : "ear") }
+                        .help("Plays the recording with the detected notes on the piano over it, without scoring")
+                } else {
+                    Button {
+                        runner.stopTrack()
+                    } label: { Label("Stop", systemImage: "stop.fill") }
+                        .help("Stops and scores what you have sung so far")
+                }
+                TrackPositionView(runner: runner)
             case .match:
                 if runner.phase == .done {
                     Button {
@@ -356,6 +395,36 @@ struct SingTaskView: View {
                 }
             }
             Spacer()
+        }
+    }
+}
+
+/// Where a recording is up to, and a slider to start from somewhere else.
+struct TrackPositionView: View {
+    @ObservedObject var runner: SingRunner
+
+    private func clock(_ seconds: Double) -> String {
+        let whole = Int(max(0, seconds))
+        return "\(whole / 60):" + String(format: "%02d", whole % 60)
+    }
+
+    var body: some View {
+        let total = max(1, runner.totalLength)
+        if runner.isMoving {
+            TimelineView(.periodic(from: .now, by: 0.25)) { timeline in
+                // The date is read so that each tick really redraws.
+                let now = min(total, max(0, runner.displayTime() + 0 * timeline.date.timeIntervalSinceReferenceDate))
+                HStack(spacing: 8) {
+                    ProgressView(value: now, total: total).frame(width: 220)
+                    Text("\(clock(now)) / \(clock(total))").font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                }
+            }
+        } else {
+            HStack(spacing: 8) {
+                Slider(value: $runner.seekOffset, in: 0...total).frame(width: 220)
+                    .help("Drag to start from a different place in the recording")
+                Text("\(clock(runner.seekOffset)) / \(clock(total))").font(.callout).monospacedDigit().foregroundStyle(.secondary)
+            }
         }
     }
 }

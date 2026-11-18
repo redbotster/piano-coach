@@ -71,6 +71,23 @@ final class AppModel: ObservableObject {
     private(set) var progress: ProgressStore
     private(set) var history: HistoryStore
     let library = SongLibrary()
+    let tracks = TrackLibrary()
+    /// What the track import is doing, while it runs.
+    @Published private(set) var trackImportStatus: String?
+    /// Loudness of a recording being sung along with, 0...1.
+    @Published var trackVolume: Double {
+        didSet {
+            UserDefaults.standard.set(trackVolume, forKey: "trackVolume")
+            audio.fileVolume = Float(trackVolume)
+        }
+    }
+    /// Play the detected notes on the piano while singing with a recording.
+    @Published var trackGuide: Bool {
+        didSet {
+            UserDefaults.standard.set(trackGuide, forKey: "trackGuide")
+            singRunner?.pianoGuide = trackGuide
+        }
+    }
     @Published private(set) var sections: [CurriculumSection] = Curriculum.sections
 
     /// Sidebar destinations that are not lessons.
@@ -195,6 +212,8 @@ final class AppModel: ObservableObject {
         fallingNotes = defaults.object(forKey: "fallingNotes") as? Bool ?? true
         soundFontPath = defaults.string(forKey: "soundFontPath")
         headphones = defaults.bool(forKey: "voiceHeadphones")
+        trackVolume = defaults.object(forKey: "trackVolume") as? Double ?? 0.8
+        trackGuide = defaults.bool(forKey: "trackGuide")
         voiceRange = Self.storedVoiceRange(profiles.currentID)
         if let path = soundFontPath, !audio.loadInstrument(from: URL(fileURLWithPath: path)) { soundFontPath = nil }
 
@@ -222,7 +241,7 @@ final class AppModel: ObservableObject {
     }
 
     private func rebuildIndex() {
-        sections = Curriculum.sections + (library.section.map { [$0] } ?? [])
+        sections = Curriculum.sections + (library.section.map { [$0] } ?? []) + (tracks.section.map { [$0] } ?? [])
         lessonIndex = [:]
         lessonOrder = []
         for section in sections {
@@ -260,7 +279,51 @@ final class AppModel: ObservableObject {
     func removeImportedSong(_ id: String) {
         if selectedLessonID == id { selectedLessonID = Self.todayID }
         library.remove(id: id)
+        tracks.remove(id: id)
         rebuildIndex()
+    }
+
+    /// True for lessons the user imported (songs or recordings), which can be removed.
+    func isImported(_ lessonID: String) -> Bool { library.contains(lessonID) || tracks.contains(lessonID) }
+
+    /// Ask for a recording (MP3 and other sound files), work out its key and sung notes, and add it to My Tracks.
+    func importTrack() {
+        guard trackImportStatus == nil else { return }
+        let panel = NSOpenPanel()
+        panel.allowedFileTypes = ["mp3", "m4a", "aac", "wav", "aif", "aiff", "caf", "flac", "mp4"]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a recording to sing along with"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        importTrack(from: url)
+    }
+
+    func importTrack(from url: URL) {
+        let name = url.deletingPathExtension().lastPathComponent
+        trackImportStatus = "Listening to “\(name)”…"
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            var last = -1
+            let outcome = Result { try self.tracks.prepare(url) { fraction in
+                let percent = Int(fraction * 100)
+                guard percent / 5 != last / 5 else { return }
+                last = percent
+                DispatchQueue.main.async { if self.trackImportStatus != nil { self.trackImportStatus = "Listening to “\(name)”… \(percent)%" } }
+            } }
+            DispatchQueue.main.async {
+                self.trackImportStatus = nil
+                switch outcome {
+                case .success(let track):
+                    self.tracks.add(track)
+                    self.rebuildIndex()
+                    self.selectedLessonID = track.lessonID
+                case .failure(let error):
+                    let alert = NSAlert()
+                    alert.messageText = "“\(url.lastPathComponent)” could not be added"
+                    alert.informativeText = error.localizedDescription
+                    alert.runModal()
+                }
+            }
+        }
     }
 
     // MARK: Sound and calibration
@@ -438,6 +501,8 @@ final class AppModel: ObservableObject {
         singRunner?.stop()
         let runner = SingRunner(task: task, range: voiceRange, headphones: headphones)
         runner.audio = audio
+        runner.pianoGuide = trackGuide
+        audio.fileVolume = Float(trackVolume)
         runner.onFinish = { [weak self] result in self?.singFinished(result) }
         runner.onRange = { [weak self] range in self?.voiceRange = range }
         singSink = runner.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }

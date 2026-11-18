@@ -42,6 +42,12 @@ final class SingRunner: ObservableObject {
     @Published private(set) var freeSeconds = 0.0
     @Published private(set) var freeSpan = 0.0
     private var freeTime = 0.0
+    /// Recordings: where in the recording to start from, in seconds.
+    @Published var seekOffset = 0.0
+    /// Recordings: also play the detected notes on the piano.
+    var pianoGuide = false
+    /// First note scored in this attempt (later than 0 when starting part-way through a recording).
+    private var firstScored = 0
 
     private(set) var trace: [TracePoint] = []
     var audio: AudioEngine?
@@ -65,6 +71,8 @@ final class SingRunner: ObservableObject {
     private var freeLow = Double.infinity
     private var freeHigh = -Double.infinity
     private var pending: [DispatchWorkItem] = []
+    /// While previewing a recording: the host time at which its beginning would have played.
+    private var listenStart: Double?
 
     var bpm: Double { if case .timed(let bpm) = task.kind { return bpm } else { return 80 } }
     var isTimed: Bool { task.isTimed }
@@ -84,6 +92,11 @@ final class SingRunner: ObservableObject {
             list.append(Target(midi: note.semitone.map { range.tonic(for: task.span) + $0 }, start: cursor, length: length, label: note.label))
             cursor += length
         }
+        if let track = task.track?.track {
+            // A recording brings its own notes, at their real pitch and time.
+            list = track.notes.map { Target(midi: $0.midi, start: $0.start, length: $0.length, label: Music.name($0.midi)) }
+            cursor = track.duration
+        }
         targets = list
         totalSeconds = cursor
         statuses = Array(repeating: .pending, count: list.count)
@@ -95,6 +108,9 @@ final class SingRunner: ObservableObject {
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
+
+    var isTrack: Bool { task.track != nil }
+    var totalLength: Double { totalSeconds }
 
     /// Lowest and highest MIDI notes the display should cover.
     var displayRange: ClosedRange<Int> {
@@ -113,6 +129,10 @@ final class SingRunner: ObservableObject {
             return
         }
         guard isTimed, phase == .ready || phase == .done else { return }
+        if let track = task.track {
+            beginTrack(track)
+            return
+        }
         reset()
         let beat = 60 / bpm
         let countIn = 4
@@ -143,6 +163,44 @@ final class SingRunner: ObservableObject {
         clock.beat = -Double(countIn) * beat
     }
 
+    /// Start the recording from `seekOffset` and score the notes as they go by.
+    private func beginTrack(_ track: TrackRef) {
+        let offset = min(max(0, seekOffset), max(0, totalSeconds - 1))
+        reset()
+        seekOffset = offset
+        let lead = 0.6
+        let now = HostClock.now()
+        startTime = now + lead - offset
+        index = targets.firstIndex { $0.start >= offset } ?? targets.count
+        firstScored = index
+        audio?.playFile(track.audio, from: offset, at: now + lead)
+        if pianoGuide, headphones {
+            var notes: [NoteSequencer.Event] = []
+            for target in targets[index...] {
+                guard let midi = target.midi else { continue }
+                notes.append(.init(time: startTime + target.start, note: midi, velocity: 50))
+                notes.append(.init(time: startTime + target.start + target.length * 0.92, note: midi, velocity: 0))
+            }
+            play(notes)
+        }
+        clock.beat = offset - lead
+        phase = .running
+    }
+
+    /// Stop a recording part-way and score what was sung so far.
+    func stopTrack() {
+        guard isTrack, phase == .running else { return }
+        let sung = (firstScored..<index).filter { targets[$0].midi != nil }
+        if sung.count >= 4 {
+            seekOffset = 0
+            finishTimed(upTo: index)
+        } else {
+            let position = max(0, HostClock.now() - startTime)
+            reset()
+            seekOffset = position
+        }
+    }
+
     /// Play the exercise on the piano without scoring.
     func listen() {
         guard phase != .countIn, !(isTimed && phase == .running) else { return }
@@ -150,7 +208,18 @@ final class SingRunner: ObservableObject {
         let now = HostClock.now() + 0.15
         var notes: [NoteSequencer.Event] = []
         var end = 0.0
-        if case .match = task.kind {
+        if let track = task.track {
+            // The recording with the detected notes on the piano over it, to check them by ear.
+            let offset = min(max(0, seekOffset), max(0, totalSeconds - 1))
+            audio?.playFile(track.audio, from: offset, at: now)
+            for target in targets where target.start >= offset {
+                guard let midi = target.midi else { continue }
+                notes.append(.init(time: now + target.start - offset, note: midi, velocity: 78))
+                notes.append(.init(time: now + target.start - offset + target.length * 0.92, note: midi, velocity: 0))
+            }
+            end = totalSeconds - offset
+            listenStart = now - offset
+        } else if case .match = task.kind {
             for (i, target) in targets.enumerated() {
                 guard let midi = target.midi else { continue }
                 notes.append(.init(time: now + Double(i) * 0.8, note: midi, velocity: 72))
@@ -168,7 +237,13 @@ final class SingRunner: ObservableObject {
         play(notes)
         isListening = true
         if !headphones { ignoreUntil = now + end + 0.3 }
-        after(end + 0.3) { [weak self] in self?.isListening = false }
+        after(end + 0.3) { [weak self] in
+            self?.isListening = false
+            if self?.listenStart != nil {
+                self?.listenStart = nil
+                self?.seekOffset = 0
+            }
+        }
     }
 
     /// Sound the current note of an untimed exercise.
@@ -206,6 +281,8 @@ final class SingRunner: ObservableObject {
         freeSpan = 0
         freeLow = .infinity
         freeHigh = -.infinity
+        firstScored = 0
+        listenStart = nil
         result = nil
         origin = HostClock.now()
         clock.beat = 0
@@ -223,6 +300,9 @@ final class SingRunner: ObservableObject {
         pending = []
         sequencer?.stop()
         audio?.cancelClicks()
+        if isTrack { audio?.stopFile() }
+        if isListening, let listenStart { seekOffset = min(max(0, HostClock.now() - listenStart), max(0, totalSeconds - 1)) }
+        listenStart = nil
         isListening = false
     }
 
@@ -239,10 +319,12 @@ final class SingRunner: ObservableObject {
     }
 
     /// True while the display should scroll.
-    var isMoving: Bool { isTimed ? (phase == .countIn || phase == .running) : phase != .done }
+    var isMoving: Bool { isTimed ? (phase == .countIn || phase == .running || listenStart != nil) : phase != .done }
 
     /// Seconds on the exercise's own timeline, read straight from the clock for smooth drawing.
     func displayTime() -> Double {
+        if let listenStart, !AppModel.headless { return HostClock.now() - listenStart }
+        if isTrack, phase == .ready { return seekOffset }
         guard isMoving, !AppModel.headless else { return clock.beat }
         return isTimed ? HostClock.now() - startTime : HostClock.now() - origin
     }
@@ -292,7 +374,7 @@ final class SingRunner: ObservableObject {
         lastFrameTime = frame.time
         guard phase != .done, frame.time >= ignoreUntil else { return }
         switch task.kind {
-        case .timed:
+        case .timed, .track:
             guard phase == .running || phase == .countIn else { return }
             let t = frame.time - startTime
             let i = targets.firstIndex { t >= $0.start && t < $0.start + $0.length }
@@ -395,12 +477,13 @@ final class SingRunner: ObservableObject {
         }
     }
 
-    private func finishTimed() {
-        while index < targets.count {
+    private func finishTimed(upTo limit: Int? = nil) {
+        let end = limit ?? targets.count
+        while index < end {
             settle(index)
             index += 1
         }
-        let sung = targets.indices.filter { targets[$0].midi != nil }
+        let sung = (firstScored..<end).filter { targets[$0].midi != nil }
         let correct = sung.filter { statuses[$0] == .correct }.count
         finish(accuracy: Double(correct) / Double(max(1, sung.count)), correct: correct, total: sung.count, detail: nil)
     }
@@ -499,6 +582,31 @@ final class SingRunner: ObservableObject {
         }
         runner.stop()
         expect(runner.result?.accuracy == 1 && runner.phase == .done, "holding each note in tune completes a matching exercise")
+
+        // A recording: notes at their own times; starting part-way and stopping early scores only what went by.
+        let recorded = VoiceTrack(id: "t", title: "T", audioFile: "t.mp3", sourceFile: "t.mp3", duration: 12, keyTonic: 0, minor: false,
+                                  keyConfidence: 1, tuningCents: 0,
+                                  notes: (0..<10).map { TrackNote(start: 1 + Double($0), length: 0.8, midi: 60 + $0 % 5) })
+        let along = SingRunner(task: SingTask(title: "T", instructions: "", kind: .track, pass: 0.5,
+                                              track: TrackRef(track: recorded, audio: URL(fileURLWithPath: "/dev/null"))),
+                               range: range, headphones: true)
+        expect(along.targets.count == 10 && along.targets[3].midi == 63 && along.targets[3].start == 4 && along.isTimed,
+               "a recording's notes keep their own pitch and time")
+        along.seekOffset = 3.5
+        along.begin()
+        expect(along.index == 3 && along.phase == .running, "starting part-way begins at the next note")
+        for i in 3..<8 {
+            let target = along.targets[i]
+            var t = target.start
+            while t < target.start + target.length {
+                // The fifth of these is sung a semitone out.
+                along.ingest(PitchFrame(time: along.startTime + t, midi: Double(target.midi! - 12) + (i == 7 ? 1 : 0.1), level: 0.5, clarity: 0.95))
+                t += 0.011
+            }
+        }
+        along.finishTimed(upTo: 8)
+        along.stop()
+        expect(along.result?.total == 5 && along.result?.correct == 4, "stopping early scores only the notes that went by")
 
         print(failures == 0 ? "All singing checks passed" : "\(failures) singing check(s) FAILED")
         return failures == 0

@@ -69,7 +69,8 @@ enum Main {
             let sequencer = NoteSequencer.selfTest()
             let voice = VoiceEngine.selfTest()
             let singing = SingRunner.selfTest()
-            exit(engine && importer && plan && profiles && sequencer && voice && singing ? 0 : 1)
+            let tracks = TrackAnalyzer.selfTest()
+            exit(engine && importer && plan && profiles && sequencer && voice && singing && tracks ? 0 : 1)
         }
         if let i = args.firstIndex(of: "--import-info"), args.count > i + 1 {
             for path in args[(i + 1)...] { print(SongImport.debugSummary(of: URL(fileURLWithPath: path))) }
@@ -94,6 +95,39 @@ enum Main {
                 }
             }
             exit(failed ? 1 : 0)
+        }
+        if let i = args.firstIndex(of: "--analyze"), args.count > i + 1 {
+            // Prints the key and sung notes found in a recording.
+            do {
+                let result = try TrackAnalyzer.analyze(url: URL(fileURLWithPath: args[i + 1]))
+                print(String(format: "key: %@ %@ (confidence %.2f), tuning %+.0f cents, %.0f s, %d notes",
+                             VoiceTrack.pitchNames[result.keyTonic], result.minor ? "minor" : "major", result.keyConfidence,
+                             result.tuningCents, result.duration, result.notes.count))
+                for note in result.notes { print(String(format: "%7.2f  %5.2f  %@", note.start, note.length, Music.name(note.midi))) }
+                exit(0)
+            } catch {
+                print("FAILED: \(error.localizedDescription)")
+                exit(1)
+            }
+        }
+        if let i = args.firstIndex(of: "--import-track"), args.count > i + 1 {
+            // Adds recordings to "My Tracks" without opening the window. Restart the app to see them.
+            let library = TrackLibrary()
+            var failed = false
+            for path in args[(i + 1)...] {
+                do {
+                    let track = try library.prepare(URL(fileURLWithPath: path))
+                    print("imported: \(track.title) — \(track.keyName), \(track.notes.count) notes (lesson \(track.lessonID))")
+                } catch {
+                    failed = true
+                    print("FAILED: \(path) — \(error.localizedDescription)")
+                }
+            }
+            exit(failed ? 1 : 0)
+        }
+        if let i = args.firstIndex(of: "--demo-track"), args.count > i + 1 {
+            // Writes the made-up recording used by the self-test, for trying the sing-along screen.
+            exit(TrackAnalyzer.writeDemo(to: URL(fileURLWithPath: args[i + 1])) ? 0 : 1)
         }
         if args.contains("--voice-probe") {
             // Opens the microphone for two seconds and reports what it hears (only if access was already granted).

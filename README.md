@@ -239,7 +239,28 @@ Every built-in piece is in the public domain, mostly as excerpts in simple arran
 
 Songs have the words on the notes.
 
+### Singing along with a recording
+
+Choose **Import a track to sing…** in the sidebar and pick an MP3 (or M4A, WAV, AIFF, FLAC) up to 12 minutes long. The app listens to it, which takes a few seconds, and adds it under **My Tracks** with:
+
+- the **key** it is in;
+- the **sung line** as notes on the pitch display, found by listening for the most prominent pitched sound near the centre of the mix.
+
+Put headphones on, turn on the **Headphones** switch and press **Start**: the recording plays, the notes scroll by, and your voice is drawn over them and scored. Singing an octave lower or higher counts.
+
+| Control | What it does |
+|---|---|
+| **Check the notes** | Plays the recording with the detected notes on the piano over it, so you can hear how well they match. |
+| **Position slider** | Starts from somewhere other than the beginning. |
+| **Stop** | Stops and scores what you have sung so far. |
+| **Recording** slider | Loudness of the recording in your headphones. |
+| **Piano plays the notes too** | Adds the detected notes quietly on the piano while you sing. |
+
+Recordings are copied into the app's data folder and stay on your Mac. Right-click a track to remove it.
+
 ## Limitations
+
+- **The notes found in a recording are an estimate.** No vocal-separation model is used. The analysis follows the strongest pitched sound, so it can pick up a lead instrument, miss quiet or heavily processed singing, and split or merge notes. Repeated notes on one pitch are shown as one long note. It passes tests on a made-up mix of a voice over chords, bass and drums; it has not been checked against commercial recordings. The detected notes cannot be edited yet.
 
 - **The voice mode has not been tried with a real microphone.** Pitch detection, scoring and Auto-Tune pass tests on synthesised tones, but live input, the feel of the display, live monitoring and how Auto-Tune sounds on a real voice are untested. Only pitch is scored: breath, tone and diction are taught with self-check lists.
 
@@ -263,6 +284,9 @@ swift build                                     # debug build
 .build/debug/PianoCoach --snapshot out/ <id>    # render a lesson's steps to PNG
 .build/debug/PianoCoach --import-info <files>   # show how MIDI / MusicXML files would import
 .build/debug/PianoCoach --import <files>        # add files to My Songs from the command line (restart the app to see them)
+.build/debug/PianoCoach --analyze <recording>   # print the key and sung notes found in an MP3 or other recording
+.build/debug/PianoCoach --import-track <files>  # add recordings to My Tracks from the command line
+.build/debug/PianoCoach --demo-track <out.wav>  # write the made-up recording used by the tests
 scripts/build-app.sh                            # release build + .app bundle
 ```
 
@@ -303,7 +327,7 @@ lesson("foundations.example", "C position", "Five notes under five fingers.", [
 
 Rhythm tokens are `w h q e s t` (whole to 32nd), with `.` for dots, `r` for rests, `3`/`5`/`6` prefixes for tuplets, and `~` for ties. Run `--check` after editing; it catches notes off the keyboard, impossible hand spans, duplicate ids and bad timing.
 
-Data lives in `~/Library/Application Support/PianoCoach/`: one folder per profile under `Profiles/` (progress and history) and imported songs under `Songs/`.
+Data lives in `~/Library/Application Support/PianoCoach/`: one folder per profile under `Profiles/` (progress and history) and imported songs under `Songs/` and imported recordings under `Tracks/`.
 
 ### Releases
 

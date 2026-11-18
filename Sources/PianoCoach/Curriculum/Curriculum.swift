@@ -78,7 +78,7 @@ enum Curriculum {
                                 if notes.contains(where: { $0.beats <= 0 }) { problems.append("\(place): sing task '\(task.title)' has a zero-length note") }
                                 if task.span.upperBound - task.span.lowerBound > 19 { problems.append("\(place): sing task '\(task.title)' spans more than an octave and a fifth") }
                                 if case .timed(let bpm) = task.kind, bpm < 30 || bpm > 200 { problems.append("\(place): sing task '\(task.title)' bpm \(bpm)") }
-                            case .free, .range:
+                            case .free, .range, .track:
                                 break
                             }
                         }

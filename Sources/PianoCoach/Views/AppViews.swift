@@ -136,6 +136,21 @@ struct SidebarView: View {
                 } label: { Label("Import a song…", systemImage: "square.and.arrow.down") }
                 .buttonStyle(.plain)
                 .help("Add a MIDI or MusicXML file to My Songs")
+                Button {
+                    app.importTrack()
+                } label: {
+                    if let status = app.trackImportStatus {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text(status).lineLimit(2)
+                        }
+                    } else {
+                        Label("Import a track to sing…", systemImage: "waveform.badge.plus")
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(app.trackImportStatus != nil)
+                .help("Add an MP3 or other recording: the app finds its key and the sung notes so you can practise singing along")
             }
             ForEach(app.sections) { section in
                 Section {
@@ -149,8 +164,10 @@ struct SidebarView: View {
                                         } else {
                                             Button("Mark as Complete") { app.setCompleted(lesson.id, true) }
                                         }
-                                        if app.library.contains(lesson.id) {
-                                            Button("Remove from My Songs", role: .destructive) { app.removeImportedSong(lesson.id) }
+                                        if app.isImported(lesson.id) {
+                                            Button(app.tracks.contains(lesson.id) ? "Remove from My Tracks" : "Remove from My Songs", role: .destructive) {
+                                                app.removeImportedSong(lesson.id)
+                                            }
                                         }
                                     }
                             }
